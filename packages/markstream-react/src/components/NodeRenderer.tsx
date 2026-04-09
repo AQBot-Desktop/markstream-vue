@@ -819,9 +819,14 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     const nextKey = typeof theme === 'string'
       ? theme
       : (typeof theme === 'object' && theme && 'name' in (theme as any) ? String((theme as any).name) : null)
+    console.log('[AQBot Theme Debug] NodeRenderer useEffect:', { theme, nextKey, prevKey: desiredThemeKeyRef.current, isDark: props.isDark, darkTheme: props.codeBlockDarkTheme, lightTheme: props.codeBlockLightTheme })
     if (nextKey && desiredThemeKeyRef.current !== nextKey) {
       desiredThemeKeyRef.current = nextKey
       setDesiredMonacoTheme(theme)
+      console.log('[AQBot Theme Debug] setDesiredMonacoTheme called with:', theme)
+    }
+    else {
+      console.log('[AQBot Theme Debug] skipped setDesiredMonacoTheme — same key or null')
     }
   }, [props.codeBlockDarkTheme, props.codeBlockLightTheme, props.isDark, props.renderCodeBlocksAsPre])
 
@@ -872,6 +877,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     infographicProps: mergedInfographicProps,
     codeBlockThemes: {
       themes: props.themes,
+      darkTheme: props.codeBlockDarkTheme,
+      lightTheme: props.codeBlockLightTheme,
       monacoOptions: props.codeBlockMonacoOptions,
       minWidth: props.codeBlockMinWidth,
       maxWidth: props.codeBlockMaxWidth,
@@ -894,6 +901,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     mergedD2Props,
     mergedInfographicProps,
     props.themes,
+    props.codeBlockDarkTheme,
+    props.codeBlockLightTheme,
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,
     props.codeBlockMaxWidth,

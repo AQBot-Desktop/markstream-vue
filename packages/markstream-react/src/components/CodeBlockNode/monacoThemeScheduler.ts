@@ -38,6 +38,10 @@ function themeKey(theme: MonacoTheme): string | null {
   return String(theme)
 }
 
+export function resetLastAppliedThemeKey() {
+  lastAppliedKey = null
+}
+
 export function scheduleMonacoThemeUpdate(theme: MonacoTheme, setTheme: SetThemeFn): Promise<void> {
   const key = themeKey(theme)
   if (!key)
@@ -46,8 +50,10 @@ export function scheduleMonacoThemeUpdate(theme: MonacoTheme, setTheme: SetTheme
   if (setThemeImpl !== setTheme)
     setThemeImpl = setTheme
 
-  if (!applying && lastAppliedKey === key)
+  if (!applying && lastAppliedKey === key) {
+    console.log('[AQBot Theme Debug] scheduler: skipping, lastAppliedKey === key:', key)
     return Promise.resolve()
+  }
 
   if (inFlight && (pendingKey === key || inFlightKey === key))
     return inFlight
@@ -72,10 +78,14 @@ export function scheduleMonacoThemeUpdate(theme: MonacoTheme, setTheme: SetTheme
         break
       try {
         inFlightKey = nextKey
+        console.log('[AQBot Theme Debug] scheduler: applying theme:', nextKey)
         await Promise.resolve(impl(nextTheme))
         lastAppliedKey = nextKey
+        console.log('[AQBot Theme Debug] scheduler: applied successfully:', nextKey)
       }
-      catch {}
+      catch (err) {
+        console.error('[AQBot Theme Debug] scheduler: apply failed:', nextKey, err)
+      }
     }
   })().finally(() => {
     applying = false

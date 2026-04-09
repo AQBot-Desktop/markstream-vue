@@ -174,8 +174,11 @@ function themeLooksDark(theme: any, fallback: boolean) {
     'catppuccin-macchiato',
   ]
   const lightTokens = ['light', 'latte', 'dawn', 'lotus']
-  return darkTokens.some(token => normalized.includes(token))
-    && !lightTokens.some(token => normalized.includes(token))
+  const matchesDark = darkTokens.some(token => normalized.includes(token))
+  const matchesLight = lightTokens.some(token => normalized.includes(token))
+  if (!matchesDark && !matchesLight)
+    return fallback
+  return matchesDark && !matchesLight
 }
 
 function getColorLuminance(color: string) {

@@ -1,4 +1,4 @@
-import { scheduleMonacoThemeUpdate } from './monacoThemeScheduler'
+import { resetLastAppliedThemeKey, scheduleMonacoThemeUpdate } from './monacoThemeScheduler'
 
 type MonacoTheme = any
 type SetThemeFn = (theme: MonacoTheme, force?: boolean) => Promise<void> | void
@@ -56,7 +56,12 @@ export function subscribeMonacoThemeApplied(listener: () => void) {
 export function registerMonacoThemeSetter(setTheme: SetThemeFn | null | undefined) {
   if (typeof setTheme !== 'function')
     return
+  const isNewSetter = setThemeImpl !== setTheme
   setThemeImpl = setTheme
+  if (isNewSetter) {
+    resetLastAppliedThemeKey()
+  }
+  console.log('[AQBot Theme Debug] registry: new setter registered, desiredKey:', desiredKey, 'isNew:', isNewSetter)
   if (desiredTheme != null && desiredKey != null) {
     void scheduleMonacoThemeUpdate(desiredTheme, setThemeImpl)
       .then(() => notify())
@@ -70,10 +75,13 @@ export function setDesiredMonacoTheme(theme: MonacoTheme | null | undefined) {
   const key = themeKey(theme)
   if (!key)
     return
-  if (desiredKey === key)
+  if (desiredKey === key) {
+    console.log('[AQBot Theme Debug] registry: desiredKey === key, skipping:', key)
     return
+  }
   desiredTheme = theme
   desiredKey = key
+  console.log('[AQBot Theme Debug] registry: setDesiredMonacoTheme:', key, 'hasImpl:', !!setThemeImpl)
   if (!setThemeImpl)
     return
   void scheduleMonacoThemeUpdate(desiredTheme, setThemeImpl)
