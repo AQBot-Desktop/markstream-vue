@@ -758,7 +758,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     if (!event.ctrlKey && !event.metaKey)
       return
     event.preventDefault()
-    const container = containerRef.current
+    const container = event.currentTarget
     if (!container)
       return
     const rect = container.getBoundingClientRect()
@@ -1093,7 +1093,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       </div>
       {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="mermaid-modal-overlay"
+          className="markstream-react mermaid-modal-overlay"
           onClick={() => closeModal()}
         >
           <div
@@ -1108,7 +1108,33 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
               </span>
               <button type="button" className="mermaid-modal-close" onClick={closeModal}>{t('common.close')}</button>
             </div>
-            <div className="mermaid-modal-body">
+            <div
+              className="mermaid-modal-body"
+              onWheel={handleWheel}
+              onMouseDown={(event) => {
+                if (event.button !== 0)
+                  return
+                event.preventDefault()
+                startDrag(event.clientX, event.clientY)
+              }}
+              onMouseMove={event => onDrag(event.clientX, event.clientY)}
+              onMouseUp={stopDrag}
+              onMouseLeave={stopDrag}
+              onTouchStart={(event) => {
+                const touch = event.touches[0]
+                if (!touch)
+                  return
+                startDrag(touch.clientX, touch.clientY)
+              }}
+              onTouchMove={(event) => {
+                const touch = event.touches[0]
+                if (!touch)
+                  return
+                onDrag(touch.clientX, touch.clientY)
+              }}
+              onTouchEnd={stopDrag}
+              style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            >
               <div ref={modalContentRef} className="mermaid-modal-content" />
             </div>
           </div>

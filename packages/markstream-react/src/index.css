@@ -706,7 +706,10 @@ li .paragraph-node {
   --mermaid-modal-text: #0f172a;
   --mermaid-modal-border: rgba(148, 163, 184, 0.25);
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(64rem, calc(100% - 2rem));
+  height: calc(100% - 4rem);
   margin: 2rem auto;
   border-radius: 0.75rem;
   overflow: hidden;
@@ -751,9 +754,10 @@ li .paragraph-node {
 }
 
 .mermaid-modal-body {
-  padding: 1rem;
-  max-height: 80vh;
-  overflow: auto;
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  position: relative;
 }
 
 .mermaid-modal-content {
@@ -761,6 +765,7 @@ li .paragraph-node {
   height: 100%;
   display: flex;
   justify-content: center;
+  overflow: hidden;
 }
 
 .fullscreen {

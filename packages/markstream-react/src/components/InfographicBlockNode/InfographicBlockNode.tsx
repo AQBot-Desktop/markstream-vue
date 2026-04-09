@@ -488,7 +488,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
       </div>
 
       {modalOpen && typeof document !== 'undefined' && createPortal(
-        <div className="infographic-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeModal} role="dialog" aria-modal="true">
+        <div className="markstream-react infographic-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeModal} role="dialog" aria-modal="true">
           <div className={clsx('infographic-modal-panel dialog-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden', { 'is-dark': props.isDark })} onClick={e => e.stopPropagation()}>
             <div className="absolute top-6 right-6 z-50 flex items-center gap-2">
               <button className="infographic-zoom-btn p-2 text-xs rounded transition-colors" onClick={() => setZoom(Math.min(zoom + 0.1, 3))}>+</button>
