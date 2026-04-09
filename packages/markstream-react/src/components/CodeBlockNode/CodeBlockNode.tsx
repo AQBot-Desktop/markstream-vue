@@ -1,11 +1,11 @@
 import type { VisibilityHandle } from '../../context/viewportPriority'
-import type { CodeBlockNodeProps } from '../../types/component-props'
+import type { CodeBlockActionContext, CodeBlockNodeProps } from '../../types/component-props'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
-import { HtmlPreviewFrame } from './HtmlPreviewFrame'
+
 import { getUseMonaco } from './monaco'
 import { getDesiredMonacoTheme, registerMonacoThemeSetter, subscribeMonacoThemeApplied } from './monacoThemeRegistry'
 import { scheduleMonacoThemeUpdate } from './monacoThemeScheduler'
@@ -224,6 +224,8 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     showCollapseButton,
     showFontSizeButtons,
     showTooltips,
+    renderHeaderActions,
+    renderHeader,
   } = props
 
   const editorHostRef = useRef<HTMLDivElement | null>(null)
@@ -1025,6 +1027,28 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       setInlinePreviewOpen(v => !v)
   }, [canonicalLanguage, isPreviewable, node, props, t])
 
+  const actionContext = useMemo<CodeBlockActionContext>(() => ({
+    collapsed,
+    copied,
+    expanded,
+    fontSize,
+    defaultFontSize,
+    isDark: resolvedSurfaceIsDark,
+    language: canonicalLanguage,
+    displayLanguage,
+    languageIcon,
+    isPreviewable,
+    code: resolvedCode,
+    toggleCollapse: () => setCollapsed(v => !v),
+    copy,
+    toggleExpand: () => setExpanded(v => !v),
+    setFontSize: (size: number) => setFontSize(Math.max(10, Math.min(36, size))),
+    resetFontSize: () => setFontSize(defaultFontSize),
+    decreaseFontSize: () => setFontSize(v => Math.max(10, v - 1)),
+    increaseFontSize: () => setFontSize(v => Math.min(36, v + 1)),
+    previewCode,
+  }), [collapsed, copied, expanded, fontSize, defaultFontSize, resolvedSurfaceIsDark, canonicalLanguage, displayLanguage, languageIcon, isPreviewable, resolvedCode, copy, previewCode])
+
   if (useFallback)
     return <PreCodeNode node={node as any} />
 
@@ -1042,236 +1066,244 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       style={containerStyle}
     >
       {showHeader && (
-        <div
-          className="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-          style={headerStyle}
-        >
-          <div className="flex items-center space-x-2 flex-1 overflow-hidden">
-            <span
-              className="icon-slot h-4 w-4 flex-shrink-0"
-              // language icons are trusted internal assets or user-supplied via resolver
-              dangerouslySetInnerHTML={{ __html: languageIcon }}
-            />
-            <span className="text-sm font-medium font-mono truncate">{displayLanguage}</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            {showCollapseButton && (
-              <button
-                type="button"
-                className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                aria-pressed={collapsed}
-                onClick={() => setCollapsed(v => !v)}
-                onMouseEnter={e => onBtnHover(e, collapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
-                onFocus={e => onBtnHover(e as any, collapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
-                onMouseLeave={onBtnLeave}
-                onBlur={onBtnLeave}
-              >
-                <svg
-                  style={{ rotate: collapsed ? '0deg' : '90deg' }}
-                  xmlns="http://www.w3.org/2000/svg"
-                  xmlnsXlink="http://www.w3.org/1999/xlink"
-                  aria-hidden="true"
-                  role="img"
-                  width="1em"
-                  height="1em"
-                  viewBox="0 0 24 24"
-                  className="w-3 h-3"
-                >
-                  <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
-                </svg>
-              </button>
-            )}
-
-            {showFontSizeButtons && enableFontSizeControl && (
-              <>
-                <button
-                  type="button"
-                  className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                  disabled={fontSize <= 10}
-                  onClick={() => setFontSize(v => Math.max(10, v - 1))}
-                  onMouseEnter={e => onBtnHover(e, t('common.decrease') || 'Decrease')}
-                  onFocus={e => onBtnHover(e as any, t('common.decrease') || 'Decrease')}
-                  onMouseLeave={onBtnLeave}
-                  onBlur={onBtnLeave}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    xmlnsXlink="http://www.w3.org/1999/xlink"
-                    aria-hidden="true"
-                    role="img"
-                    width="1em"
-                    height="1em"
-                    viewBox="0 0 24 24"
-                    className="w-3 h-3"
-                  >
-                    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                  disabled={fontSize === defaultFontSize}
-                  onClick={() => setFontSize(defaultFontSize)}
-                  onMouseEnter={e => onBtnHover(e, t('common.reset') || 'Reset')}
-                  onFocus={e => onBtnHover(e as any, t('common.reset') || 'Reset')}
-                  onMouseLeave={onBtnLeave}
-                  onBlur={onBtnLeave}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    xmlnsXlink="http://www.w3.org/1999/xlink"
-                    aria-hidden="true"
-                    role="img"
-                    width="1em"
-                    height="1em"
-                    viewBox="0 0 24 24"
-                    className="w-3 h-3"
-                  >
-                    <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-                      <path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                      <path d="M3 3v5h5" />
-                    </g>
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                  disabled={fontSize >= 36}
-                  onClick={() => setFontSize(v => Math.min(36, v + 1))}
-                  onMouseEnter={e => onBtnHover(e, t('common.increase') || 'Increase')}
-                  onFocus={e => onBtnHover(e as any, t('common.increase') || 'Increase')}
-                  onMouseLeave={onBtnLeave}
-                  onBlur={onBtnLeave}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    xmlnsXlink="http://www.w3.org/1999/xlink"
-                    aria-hidden="true"
-                    role="img"
-                    width="1em"
-                    height="1em"
-                    viewBox="0 0 24 24"
-                    className="w-3 h-3"
-                  >
-                    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14m-7-7v14" />
-                  </svg>
-                </button>
-              </>
-            )}
-
-            {showCopyButton && (
-              <button
-                type="button"
-                className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                aria-label={copied ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')}
-                onClick={copy}
-                onMouseEnter={e => onBtnHover(e, copied ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
-                onFocus={e => onBtnHover(e as any, copied ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
-                onMouseLeave={onBtnLeave}
-                onBlur={onBtnLeave}
-              >
-                {!copied
-                  ? (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        xmlnsXlink="http://www.w3.org/1999/xlink"
-                        aria-hidden="true"
-                        role="img"
-                        width="1em"
-                        height="1em"
-                        viewBox="0 0 24 24"
-                        className="w-3 h-3"
+        renderHeader
+          ? renderHeader(actionContext)
+          : (
+            <div
+              className="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
+              style={headerStyle}
+            >
+              <div className="flex items-center space-x-2 flex-1 overflow-hidden">
+                <span
+                  className="icon-slot h-4 w-4 flex-shrink-0"
+                  // language icons are trusted internal assets or user-supplied via resolver
+                  dangerouslySetInnerHTML={{ __html: languageIcon }}
+                />
+                <span className="text-sm font-medium font-mono truncate">{displayLanguage}</span>
+              </div>
+              {renderHeaderActions
+                ? renderHeaderActions(actionContext)
+                : (
+                  <div className="flex items-center space-x-2">
+                    {showCollapseButton && (
+                      <button
+                        type="button"
+                        className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                        aria-pressed={collapsed}
+                        onClick={() => setCollapsed(v => !v)}
+                        onMouseEnter={e => onBtnHover(e, collapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
+                        onFocus={e => onBtnHover(e as any, collapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
+                        onMouseLeave={onBtnLeave}
+                        onBlur={onBtnLeave}
                       >
-                        <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                        </g>
-                      </svg>
-                    )
-                  : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        xmlnsXlink="http://www.w3.org/1999/xlink"
-                        aria-hidden="true"
-                        role="img"
-                        width="1em"
-                        height="1em"
-                        viewBox="0 0 24 24"
-                        className="w-3 h-3"
-                      >
-                        <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" />
-                      </svg>
+                        <svg
+                          style={{ rotate: collapsed ? '0deg' : '90deg' }}
+                          xmlns="http://www.w3.org/2000/svg"
+                          xmlnsXlink="http://www.w3.org/1999/xlink"
+                          aria-hidden="true"
+                          role="img"
+                          width="1em"
+                          height="1em"
+                          viewBox="0 0 24 24"
+                          className="w-3 h-3"
+                        >
+                          <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
+                        </svg>
+                      </button>
                     )}
-              </button>
-            )}
 
-            {showExpandButton && (
-              <button
-                type="button"
-                className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                aria-pressed={expanded}
-                onClick={(e) => {
-                  setExpanded(v => !v)
-                  onBtnHover(e, !expanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))
-                }}
-                onMouseEnter={e => onBtnHover(e, expanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))}
-                onFocus={e => onBtnHover(e as any, expanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))}
-                onMouseLeave={onBtnLeave}
-                onBlur={onBtnLeave}
-              >
-                {expanded
-                  ? (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        xmlnsXlink="http://www.w3.org/1999/xlink"
-                        aria-hidden="true"
-                        role="img"
-                        width="1em"
-                        height="1em"
-                        viewBox="0 0 24 24"
-                        className="w-3 h-3"
-                      >
-                        <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" />
-                      </svg>
-                    )
-                  : (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        xmlnsXlink="http://www.w3.org/1999/xlink"
-                        aria-hidden="true"
-                        role="img"
-                        width="1em"
-                        height="1em"
-                        viewBox="0 0 24 24"
-                        className="w-3 h-3"
-                      >
-                        <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" />
-                      </svg>
+                    {showFontSizeButtons && enableFontSizeControl && (
+                      <>
+                        <button
+                          type="button"
+                          className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                          disabled={fontSize <= 10}
+                          onClick={() => setFontSize(v => Math.max(10, v - 1))}
+                          onMouseEnter={e => onBtnHover(e, t('common.decrease') || 'Decrease')}
+                          onFocus={e => onBtnHover(e as any, t('common.decrease') || 'Decrease')}
+                          onMouseLeave={onBtnLeave}
+                          onBlur={onBtnLeave}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            xmlnsXlink="http://www.w3.org/1999/xlink"
+                            aria-hidden="true"
+                            role="img"
+                            width="1em"
+                            height="1em"
+                            viewBox="0 0 24 24"
+                            className="w-3 h-3"
+                          >
+                            <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                          disabled={fontSize === defaultFontSize}
+                          onClick={() => setFontSize(defaultFontSize)}
+                          onMouseEnter={e => onBtnHover(e, t('common.reset') || 'Reset')}
+                          onFocus={e => onBtnHover(e as any, t('common.reset') || 'Reset')}
+                          onMouseLeave={onBtnLeave}
+                          onBlur={onBtnLeave}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            xmlnsXlink="http://www.w3.org/1999/xlink"
+                            aria-hidden="true"
+                            role="img"
+                            width="1em"
+                            height="1em"
+                            viewBox="0 0 24 24"
+                            className="w-3 h-3"
+                          >
+                            <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                              <path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                              <path d="M3 3v5h5" />
+                            </g>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                          disabled={fontSize >= 36}
+                          onClick={() => setFontSize(v => Math.min(36, v + 1))}
+                          onMouseEnter={e => onBtnHover(e, t('common.increase') || 'Increase')}
+                          onFocus={e => onBtnHover(e as any, t('common.increase') || 'Increase')}
+                          onMouseLeave={onBtnLeave}
+                          onBlur={onBtnLeave}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            xmlnsXlink="http://www.w3.org/1999/xlink"
+                            aria-hidden="true"
+                            role="img"
+                            width="1em"
+                            height="1em"
+                            viewBox="0 0 24 24"
+                            className="w-3 h-3"
+                          >
+                            <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14m-7-7v14" />
+                          </svg>
+                        </button>
+                      </>
                     )}
-              </button>
-            )}
 
-            {isPreviewable && showPreviewButton && (
-              <button
-                type="button"
-                className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-                aria-label={t('common.preview') || 'Preview'}
-                onClick={previewCode}
-                onMouseEnter={e => onBtnHover(e, t('common.preview') || 'Preview')}
-                onFocus={e => onBtnHover(e as any, t('common.preview') || 'Preview')}
-                onMouseLeave={onBtnLeave}
-                onBlur={onBtnLeave}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24">
-                  <g fill="currentColor" fillRule="evenodd" clipRule="evenodd">
-                    <path d="M23.628 7.41c-.12-1.172-.08-3.583-.9-4.233c-1.921-1.51-6.143-1.11-8.815-1.19c-3.481-.15-7.193.14-10.625.24a.34.34 0 0 0 0 .67c3.472-.05 7.074-.29 10.575-.09c2.471.15 6.653-.14 8.254 1.16c.4.33.41 2.732.49 3.582a42 42 0 0 1 .08 9.005a13.8 13.8 0 0 1-.45 3.001c-2.42 1.4-19.69 2.381-20.72.55a21 21 0 0 1-.65-4.632a41.5 41.5 0 0 1 .12-7.964c.08 0 7.334.33 12.586.24c2.331 0 4.682-.13 6.764-.21a.33.33 0 0 0 0-.66c-7.714-.16-12.897-.43-19.31.05c.11-1.38.48-3.922.38-4.002a.3.3 0 0 0-.42 0c-.37.41-.29 1.77-.36 2.251s-.14 1.07-.2 1.6a45 45 0 0 0-.36 8.645a21.8 21.8 0 0 0 .66 5.002c1.46 2.702 17.248 1.461 20.95.43c1.45-.4 1.69-.8 1.871-1.95c.575-3.809.602-7.68.08-11.496" />
-                    <path d="M4.528 5.237a.84.84 0 0 0-.21-1c-.77-.41-1.71.39-1 1.1a.83.83 0 0 0 1.21-.1m2.632-.25c.14-.14.19-.84-.2-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.2-.09m2.88 0a.83.83 0 0 0-.21-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.21-.09m-4.29 8.735c0 .08.23 2.471.31 2.561a.371.371 0 0 0 .63-.14c0-.09 0 0 .15-1.72a10 10 0 0 0-.11-2.232a5.3 5.3 0 0 1-.26-1.37a.3.3 0 0 0-.54-.24a6.8 6.8 0 0 0-.2 2.33c-1.281-.38-1.121.13-1.131-.42a15 15 0 0 0-.19-1.93c-.16-.17-.36-.17-.51.14a20 20 0 0 0-.43 3.471c.04.773.18 1.536.42 2.272c.26.4.7.22.7-.1c0-.09-.16-.09 0-1.862c.06-1.18-.23-.3 1.16-.76m5.033-2.552c.32-.07.41-.28.39-.37c0-.55-3.322-.34-3.462-.24s-.2.18-.18.28s0 .11 0 .16a3.8 3.8 0 0 0 1.591.361v.82a15 15 0 0 0-.13 3.132c0 .2-.09.94.17 1.16a.34.34 0 0 0 .48 0c.125-.35.196-.718.21-1.09a8 8 0 0 0 .14-3.232c0-.13.05-.7-.1-.89a8 8 0 0 0 .89-.09m5.544-.181a.69.69 0 0 0-.89-.44a2.8 2.8 0 0 0-1.252 1.001a2.3 2.3 0 0 0-.41-.83a1 1 0 0 0-1.6.27a7 7 0 0 0-.35 2.07c0 .571 0 2.642.06 2.762c.14 1.09 1 .51.63.13a17.6 17.6 0 0 1 .38-3.962c.32-1.18.32.2.39.51s.11 1.081.73 1.081s.48-.93 1.401-1.78q.075 1.345 0 2.69a15 15 0 0 0 0 1.811a.34.34 0 0 0 .68 0q.112-.861.11-1.73a16.7 16.7 0 0 0 .12-3.582m1.441-.201c-.05.16-.3 3.002-.31 3.202a6.3 6.3 0 0 0 .21 1.741c.33 1 1.21 1.07 2.291.82a3.7 3.7 0 0 0 1.14-.23c.21-.22.10-.59-.41-.64q-.817.096-1.64.07c-.44-.07-.34 0-.67-4.442q.015-.185 0-.37a.316.316 0 0 0-.23-.38a.316.316 0 0 0-.38.23" />
-                  </g>
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
+                    {showCopyButton && (
+                      <button
+                        type="button"
+                        className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                        aria-label={copied ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')}
+                        onClick={copy}
+                        onMouseEnter={e => onBtnHover(e, copied ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
+                        onFocus={e => onBtnHover(e as any, copied ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
+                        onMouseLeave={onBtnLeave}
+                        onBlur={onBtnLeave}
+                      >
+                        {!copied
+                          ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                xmlnsXlink="http://www.w3.org/1999/xlink"
+                                aria-hidden="true"
+                                role="img"
+                                width="1em"
+                                height="1em"
+                                viewBox="0 0 24 24"
+                                className="w-3 h-3"
+                              >
+                                <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                </g>
+                              </svg>
+                            )
+                          : (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                xmlnsXlink="http://www.w3.org/1999/xlink"
+                                aria-hidden="true"
+                                role="img"
+                                width="1em"
+                                height="1em"
+                                viewBox="0 0 24 24"
+                                className="w-3 h-3"
+                              >
+                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" />
+                              </svg>
+                            )}
+                      </button>
+                    )}
+
+                    {showExpandButton && (
+                      <button
+                        type="button"
+                        className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                        aria-pressed={expanded}
+                        onClick={(e) => {
+                          setExpanded(v => !v)
+                          onBtnHover(e, !expanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))
+                        }}
+                        onMouseEnter={e => onBtnHover(e, expanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))}
+                        onFocus={e => onBtnHover(e as any, expanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))}
+                        onMouseLeave={onBtnLeave}
+                        onBlur={onBtnLeave}
+                      >
+                        {expanded
+                          ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                xmlnsXlink="http://www.w3.org/1999/xlink"
+                                aria-hidden="true"
+                                role="img"
+                                width="1em"
+                                height="1em"
+                                viewBox="0 0 24 24"
+                                className="w-3 h-3"
+                              >
+                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" />
+                              </svg>
+                            )
+                          : (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                xmlnsXlink="http://www.w3.org/1999/xlink"
+                                aria-hidden="true"
+                                role="img"
+                                width="1em"
+                                height="1em"
+                                viewBox="0 0 24 24"
+                                className="w-3 h-3"
+                              >
+                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" />
+                              </svg>
+                            )}
+                      </button>
+                    )}
+
+                    {isPreviewable && showPreviewButton && (
+                      <button
+                        type="button"
+                        className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                        aria-label={t('common.preview') || 'Preview'}
+                        onClick={previewCode}
+                        onMouseEnter={e => onBtnHover(e, t('common.preview') || 'Preview')}
+                        onFocus={e => onBtnHover(e as any, t('common.preview') || 'Preview')}
+                        onMouseLeave={onBtnLeave}
+                        onBlur={onBtnLeave}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24">
+                          <g fill="currentColor" fillRule="evenodd" clipRule="evenodd">
+                            <path d="M23.628 7.41c-.12-1.172-.08-3.583-.9-4.233c-1.921-1.51-6.143-1.11-8.815-1.19c-3.481-.15-7.193.14-10.625.24a.34.34 0 0 0 0 .67c3.472-.05 7.074-.29 10.575-.09c2.471.15 6.653-.14 8.254 1.16c.4.33.41 2.732.49 3.582a42 42 0 0 1 .08 9.005a13.8 13.8 0 0 1-.45 3.001c-2.42 1.4-19.69 2.381-20.72.55a21 21 0 0 1-.65-4.632a41.5 41.5 0 0 1 .12-7.964c.08 0 7.334.33 12.586.24c2.331 0 4.682-.13 6.764-.21a.33.33 0 0 0 0-.66c-7.714-.16-12.897-.43-19.31.05c.11-1.38.48-3.922.38-4.002a.3.3 0 0 0-.42 0c-.37.41-.29 1.77-.36 2.251s-.14 1.07-.2 1.6a45 45 0 0 0-.36 8.645a21.8 21.8 0 0 0 .66 5.002c1.46 2.702 17.248 1.461 20.95.43c1.45-.4 1.69-.8 1.871-1.95c.575-3.809.602-7.68.08-11.496" />
+                            <path d="M4.528 5.237a.84.84 0 0 0-.21-1c-.77-.41-1.71.39-1 1.1a.83.83 0 0 0 1.21-.1m2.632-.25c.14-.14.19-.84-.2-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.2-.09m2.88 0a.83.83 0 0 0-.21-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.21-.09m-4.29 8.735c0 .08.23 2.471.31 2.561a.371.371 0 0 0 .63-.14c0-.09 0 0 .15-1.72a10 10 0 0 0-.11-2.232a5.3 5.3 0 0 1-.26-1.37a.3.3 0 0 0-.54-.24a6.8 6.8 0 0 0-.2 2.33c-1.281-.38-1.121.13-1.131-.42a15 15 0 0 0-.19-1.93c-.16-.17-.36-.17-.51.14a20 20 0 0 0-.43 3.471c.04.773.18 1.536.42 2.272c.26.4.7.22.7-.1c0-.09-.16-.09 0-1.862c.06-1.18-.23-.3 1.16-.76m5.033-2.552c.32-.07.41-.28.39-.37c0-.55-3.322-.34-3.462-.24s-.2.18-.18.28s0 .11 0 .16a3.8 3.8 0 0 0 1.591.361v.82a15 15 0 0 0-.13 3.132c0 .2-.09.94.17 1.16a.34.34 0 0 0 .48 0c.125-.35.196-.718.21-1.09a8 8 0 0 0 .14-3.232c0-.13.05-.7-.1-.89a8 8 0 0 0 .89-.09m5.544-.181a.69.69 0 0 0-.89-.44a2.8 2.8 0 0 0-1.252 1.001a2.3 2.3 0 0 0-.41-.83a1 1 0 0 0-1.6.27a7 7 0 0 0-.35 2.07c0 .571 0 2.642.06 2.762c.14 1.09 1 .51.63.13a17.6 17.6 0 0 1 .38-3.962c.32-1.18.32.2.39.51s.11 1.081.73 1.081s.48-.93 1.401-1.78q.075 1.345 0 2.69a15 15 0 0 0 0 1.811a.34.34 0 0 0 .68 0q.112-.861.11-1.73a16.7 16.7 0 0 0 .12-3.582m1.441-.201c-.05.16-.3 3.002-.31 3.202a6.3 6.3 0 0 0 .21 1.741c.33 1 1.21 1.07 2.291.82a3.7 3.7 0 0 0 1.14-.23c.21-.22.10-.59-.41-.64q-.817.096-1.64.07c-.44-.07-.34 0-.67-4.442q.015-.185 0-.37a.316.316 0 0 0-.23-.38a.316.316 0 0 0-.38.23" />
+                          </g>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
+            </div>
+          )
       )}
 
       <div className={`code-block-body${collapsed ? ' code-block-body--collapsed' : ''}${expanded ? ' code-block-body--expanded' : ''}`}>
@@ -1315,13 +1347,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         )}
       </div>
 
-      {inlinePreviewOpen && !props.onPreviewCode && isPreviewable && canonicalLanguage === 'html' && (
-        <HtmlPreviewFrame
-          code={String(node.code ?? '')}
-          isDark={isDark}
-          onClose={() => setInlinePreviewOpen(false)}
-        />
-      )}
+
       <span className="sr-only" aria-live="polite" role="status">{copied ? (t('common.copied') || 'Copied') : ''}</span>
     </div>
   )

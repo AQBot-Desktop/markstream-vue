@@ -1,5 +1,5 @@
 import type { VisibilityHandle } from '../../context/viewportPriority'
-import type { MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/component-props'
+import type { MermaidBlockActionContext, MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/component-props'
 import clsx from 'clsx'
 import React, {
   useCallback,
@@ -732,6 +732,26 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     zoom,
   ])
 
+  const actionContext: MermaidBlockActionContext = useMemo(() => ({
+    collapsed: isCollapsed,
+    copied: copying,
+    showSource,
+    modalOpen,
+    isDark: !!props.isDark,
+    code: baseFixedCode,
+    mermaidAvailable,
+    isExportDisabled: isFullscreenDisabled,
+    zoom,
+    toggleCollapse: () => setIsCollapsed(v => !v),
+    copy: handleCopy,
+    exportSvg: handleExport,
+    toggleFullscreen: () => modalOpen ? closeModal() : handleOpenModal(),
+    switchMode: handleSwitchMode,
+    zoomIn: () => setZoom(v => clamp(v + 0.1, 0.5, 3)),
+    zoomOut: () => setZoom(v => clamp(v - 0.1, 0.5, 3)),
+    resetZoom: () => { setZoom(1); setTranslate({ x: 0, y: 0 }) },
+  }), [isCollapsed, copying, showSource, modalOpen, props.isDark, baseFixedCode, mermaidAvailable, isFullscreenDisabled, zoom, handleCopy, handleExport, closeModal, handleOpenModal, handleSwitchMode])
+
   const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
     if (props.enableWheelZoom === false)
       return
@@ -777,60 +797,52 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     setIsDragging(false)
   }, [])
 
+  const defaultZoomControls = (
+    <div className="absolute top-2 right-2 z-10 rounded-lg">
+      <div className="flex items-center gap-2 backdrop-blur rounded-lg">
+        <button
+          type="button"
+          className="mermaid-zoom-btn p-2 text-xs rounded transition-colors"
+          onMouseEnter={event => handleTooltip(event, t('common.zoomIn'))}
+          onMouseLeave={() => hideTooltip()}
+          onClick={() => setZoom(clamp(zoom + 0.1, 0.5, 3))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="mermaid-zoom-btn p-2 text-xs rounded transition-colors"
+          onMouseEnter={event => handleTooltip(event, t('common.zoomOut'))}
+          onMouseLeave={() => hideTooltip()}
+          onClick={() => setZoom(clamp(zoom - 0.1, 0.5, 3))}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="mermaid-zoom-btn p-2 text-xs rounded transition-colors"
+          onMouseEnter={event => handleTooltip(event, t('common.resetZoom'))}
+          onMouseLeave={() => hideTooltip()}
+          onClick={() => {
+            setZoom(1)
+            setTranslate({ x: 0, y: 0 })
+          }}
+        >
+          {Math.round(zoom * 100)}
+          %
+        </button>
+      </div>
+    </div>
+  )
+
   const previewContent = (
     <div className="relative">
       {props.showZoomControls && (
-        <div className="absolute top-2 right-2 z-10 rounded-lg">
-          <div className="flex items-center gap-2 backdrop-blur rounded-lg">
-            <button
-              type="button"
-              className={clsx(
-                'p-2 text-xs rounded transition-colors',
-                props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200',
-              )}
-              onMouseEnter={event => handleTooltip(event, t('common.zoomIn'))}
-              onMouseLeave={() => hideTooltip()}
-              onClick={() => setZoom(clamp(zoom + 0.1, 0.5, 3))}
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className={clsx(
-                'p-2 text-xs rounded transition-colors',
-                props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200',
-              )}
-              onMouseEnter={event => handleTooltip(event, t('common.zoomOut'))}
-              onMouseLeave={() => hideTooltip()}
-              onClick={() => setZoom(clamp(zoom - 0.1, 0.5, 3))}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              className={clsx(
-                'p-2 text-xs rounded transition-colors',
-                props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200',
-              )}
-              onMouseEnter={event => handleTooltip(event, t('common.resetZoom'))}
-              onMouseLeave={() => hideTooltip()}
-              onClick={() => {
-                setZoom(1)
-                setTranslate({ x: 0, y: 0 })
-              }}
-            >
-              {Math.round(zoom * 100)}
-              %
-            </button>
-          </div>
-        </div>
+        props.renderZoomControls ? props.renderZoomControls(actionContext) : defaultZoomControls
       )}
       <div
         ref={containerRef}
-        className={clsx(
-          'min-h-[360px] relative overflow-hidden block transition-[height] duration-150 ease-out',
-          props.isDark ? 'bg-gray-900' : 'bg-gray-50',
-        )}
+        className="mermaid-block-body min-h-[360px] relative overflow-hidden block transition-[height] duration-150 ease-out"
         style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}
         onWheel={handleWheel}
         onMouseDown={(event) => {
@@ -877,176 +889,181 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     </div>
   )
 
-  const header = props.showHeader && (
-    <div
-      className={clsx(
-        'mermaid-block-header flex justify-between items-center px-4 py-2.5 border-b',
-        props.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200',
-      )}
-    >
-      <div className="flex items-center space-x-2 overflow-hidden">
-        <span
-          className="icon-slot h-4 w-4 flex-shrink-0"
-          dangerouslySetInnerHTML={{ __html: languageIcon }}
-        />
-        <span className={clsx('text-sm font-medium font-mono truncate', props.isDark ? 'text-gray-400' : 'text-gray-600')}>
-          Mermaid
-        </span>
-      </div>
-      {props.showModeToggle && mermaidAvailable && (
-        <div className={clsx('flex items-center space-x-1 rounded-md p-0.5', props.isDark ? 'bg-gray-700' : 'bg-gray-100')}>
-          <button
-            type="button"
-            className={clsx(
-              'px-2.5 py-1 text-xs rounded transition-colors',
-              !showSource
-                ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
-                : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
-            )}
-            onClick={() => handleSwitchMode('preview')}
-            onMouseEnter={event => handleTooltip(event, t('common.preview'))}
-            onFocus={event => handleTooltip(event as any, t('common.preview'))}
-            onMouseLeave={() => hideTooltip()}
-            onBlur={() => hideTooltip()}
-          >
-            <div className="flex items-center space-x-1">
-              <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-                <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-                  <path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" />
-                  <circle cx="12" cy="12" r="3" />
-                </g>
-              </svg>
-              <span>{t('common.preview')}</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            className={clsx(
-              'px-2.5 py-1 text-xs rounded transition-colors',
-              showSource
-                ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
-                : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
-            )}
-            onClick={() => handleSwitchMode('source')}
-            onMouseEnter={event => handleTooltip(event, t('common.source'))}
-            onFocus={event => handleTooltip(event as any, t('common.source'))}
-            onMouseLeave={() => hideTooltip()}
-            onBlur={() => hideTooltip()}
-          >
-            <div className="flex items-center space-x-1">
-              <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" />
-              </svg>
-              <span>{t('common.source')}</span>
-            </div>
-          </button>
+  const defaultModeToggle = props.showModeToggle && mermaidAvailable && (
+    <div className={clsx('flex items-center space-x-1 rounded-md p-0.5', props.isDark ? 'bg-gray-700' : 'bg-gray-100')}>
+      <button
+        type="button"
+        className={clsx(
+          'px-2.5 py-1 text-xs rounded transition-colors',
+          !showSource
+            ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
+            : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
+        )}
+        onClick={() => handleSwitchMode('preview')}
+        onMouseEnter={event => handleTooltip(event, t('common.preview'))}
+        onFocus={event => handleTooltip(event as any, t('common.preview'))}
+        onMouseLeave={() => hideTooltip()}
+        onBlur={() => hideTooltip()}
+      >
+        <div className="flex items-center space-x-1">
+          <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+            <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+              <path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" />
+              <circle cx="12" cy="12" r="3" />
+            </g>
+          </svg>
+          <span>{t('common.preview')}</span>
         </div>
-      )}
-      <div className="flex items-center space-x-1">
-        {props.showCollapseButton && (
-          <button
-            type="button"
-            className={computedButtonClass}
-            aria-pressed={isCollapsed}
-            onClick={() => setIsCollapsed(value => !value)}
-            onMouseEnter={event => handleTooltip(event, isCollapsed ? t('common.expand') : t('common.collapse'))}
-            onFocus={event => handleTooltip(event as any, isCollapsed ? t('common.expand') : t('common.collapse'))}
-            onMouseLeave={() => hideTooltip()}
-            onBlur={() => hideTooltip()}
-          >
-            <svg
-              style={{ rotate: isCollapsed ? '0deg' : '90deg' }}
-              xmlns="http://www.w3.org/2000/svg"
-              xmlnsXlink="http://www.w3.org/1999/xlink"
-              aria-hidden="true"
-              role="img"
-              width="1em"
-              height="1em"
-              viewBox="0 0 24 24"
-              className="w-3 h-3"
-            >
-              <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
-            </svg>
-          </button>
+      </button>
+      <button
+        type="button"
+        className={clsx(
+          'px-2.5 py-1 text-xs rounded transition-colors',
+          showSource
+            ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
+            : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
         )}
-        {props.showCopyButton && (
-          <button
-            type="button"
-            className={computedButtonClass}
-            onClick={handleCopy}
-            onMouseEnter={event => handleTooltip(event, copying ? t('common.copied') : t('common.copy'))}
-            onFocus={event => handleTooltip(event as any, copying ? t('common.copied') : t('common.copy'))}
-            onMouseLeave={() => hideTooltip()}
-            onBlur={() => hideTooltip()}
-          >
-            {!copying
-              ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-                    <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                    </g>
-                  </svg>
-                )
-              : (
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-                    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" />
-                  </svg>
-                )}
-          </button>
-        )}
-        {props.showExportButton && mermaidAvailable && (
-          <button
-            type="button"
-            className={clsx(computedButtonClass, isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : '')}
-            disabled={isFullscreenDisabled}
-            onClick={handleExport}
-            onMouseEnter={event => handleTooltip(event, t('common.export'))}
-            onFocus={event => handleTooltip(event as any, t('common.export'))}
-            onMouseLeave={() => hideTooltip()}
-            onBlur={() => hideTooltip()}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-              <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-                <path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <path d="m7 10l5 5l5-5" />
-              </g>
-            </svg>
-          </button>
-        )}
-        {props.showFullscreenButton && mermaidAvailable && (
-          <button
-            type="button"
-            className={clsx(computedButtonClass, isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : '')}
-            disabled={isFullscreenDisabled}
-            onClick={modalOpen ? closeModal : handleOpenModal}
-            onMouseEnter={event => handleTooltip(event, modalOpen ? t('common.minimize') : t('common.open'))}
-            onFocus={event => handleTooltip(event as any, modalOpen ? t('common.minimize') : t('common.open'))}
-            onMouseLeave={() => hideTooltip()}
-            onBlur={() => hideTooltip()}
-          >
-            {!modalOpen
-              ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-                    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" />
-                  </svg>
-                )
-              : (
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
-                    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" />
-                  </svg>
-                )}
-          </button>
-        )}
-      </div>
+        onClick={() => handleSwitchMode('source')}
+        onMouseEnter={event => handleTooltip(event, t('common.source'))}
+        onFocus={event => handleTooltip(event as any, t('common.source'))}
+        onMouseLeave={() => hideTooltip()}
+        onBlur={() => hideTooltip()}
+      >
+        <div className="flex items-center space-x-1">
+          <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+            <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" />
+          </svg>
+          <span>{t('common.source')}</span>
+        </div>
+      </button>
     </div>
+  )
+
+  const defaultActions = (
+    <div className="flex items-center space-x-1">
+      {props.showCollapseButton && (
+        <button
+          type="button"
+          className={computedButtonClass}
+          aria-pressed={isCollapsed}
+          onClick={() => setIsCollapsed(value => !value)}
+          onMouseEnter={event => handleTooltip(event, isCollapsed ? t('common.expand') : t('common.collapse'))}
+          onFocus={event => handleTooltip(event as any, isCollapsed ? t('common.expand') : t('common.collapse'))}
+          onMouseLeave={() => hideTooltip()}
+          onBlur={() => hideTooltip()}
+        >
+          <svg
+            style={{ rotate: isCollapsed ? '0deg' : '90deg' }}
+            xmlns="http://www.w3.org/2000/svg"
+            xmlnsXlink="http://www.w3.org/1999/xlink"
+            aria-hidden="true"
+            role="img"
+            width="1em"
+            height="1em"
+            viewBox="0 0 24 24"
+            className="w-3 h-3"
+          >
+            <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
+          </svg>
+        </button>
+      )}
+      {props.showCopyButton && (
+        <button
+          type="button"
+          className={computedButtonClass}
+          onClick={handleCopy}
+          onMouseEnter={event => handleTooltip(event, copying ? t('common.copied') : t('common.copy'))}
+          onFocus={event => handleTooltip(event as any, copying ? t('common.copied') : t('common.copy'))}
+          onMouseLeave={() => hideTooltip()}
+          onBlur={() => hideTooltip()}
+        >
+          {!copying
+            ? (
+                <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                  <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  </g>
+                </svg>
+              )
+            : (
+                <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                  <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" />
+                </svg>
+              )}
+        </button>
+      )}
+      {props.showExportButton && mermaidAvailable && (
+        <button
+          type="button"
+          className={clsx(computedButtonClass, isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : '')}
+          disabled={isFullscreenDisabled}
+          onClick={handleExport}
+          onMouseEnter={event => handleTooltip(event, t('common.export'))}
+          onFocus={event => handleTooltip(event as any, t('common.export'))}
+          onMouseLeave={() => hideTooltip()}
+          onBlur={() => hideTooltip()}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+            <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+              <path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="m7 10l5 5l5-5" />
+            </g>
+          </svg>
+        </button>
+      )}
+      {props.showFullscreenButton && mermaidAvailable && (
+        <button
+          type="button"
+          className={clsx(computedButtonClass, isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : '')}
+          disabled={isFullscreenDisabled}
+          onClick={modalOpen ? closeModal : handleOpenModal}
+          onMouseEnter={event => handleTooltip(event, modalOpen ? t('common.minimize') : t('common.open'))}
+          onFocus={event => handleTooltip(event as any, modalOpen ? t('common.minimize') : t('common.open'))}
+          onMouseLeave={() => hideTooltip()}
+          onBlur={() => hideTooltip()}
+        >
+          {!modalOpen
+            ? (
+                <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                  <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" />
+                </svg>
+              )
+            : (
+                <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                  <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" />
+                </svg>
+              )}
+        </button>
+      )}
+    </div>
+  )
+
+  const header = props.showHeader && (
+    props.renderHeader ? props.renderHeader(actionContext) : (
+      <div
+        className="mermaid-block-header flex justify-between items-center px-4 py-2.5 border-b"
+      >
+        <div className="flex items-center space-x-2 overflow-hidden">
+          <span
+            className="icon-slot h-4 w-4 flex-shrink-0"
+            dangerouslySetInnerHTML={{ __html: languageIcon }}
+          />
+          <span className="mermaid-block-title text-sm font-medium font-mono truncate">
+            Mermaid
+          </span>
+        </div>
+        {props.renderModeToggle ? props.renderModeToggle(actionContext) : defaultModeToggle}
+        {props.renderHeaderActions ? props.renderHeaderActions(actionContext) : defaultActions}
+      </div>
+    )
   )
 
   const body = (
     <div>
       {showSource
         ? (
-            <div className={clsx('p-4', props.isDark ? 'bg-gray-900 text-gray-300' : 'bg-gray-50 text-gray-700')}>
+            <div className="mermaid-block-source p-4">
               <pre className="text-sm font-mono whitespace-pre-wrap">
                 {baseFixedCode}
               </pre>
@@ -1066,8 +1083,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       <div
         className={clsx(
           'my-4 rounded-lg border overflow-hidden shadow-sm mermaid-block',
-          props.isDark ? 'border-gray-700/30' : 'border-gray-200',
-          { 'is-rendering': streaming },
+          { 'is-dark': props.isDark, 'is-rendering': streaming },
         )}
       >
         {header}

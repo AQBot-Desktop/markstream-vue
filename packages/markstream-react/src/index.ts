@@ -9,6 +9,7 @@ export { BlockquoteNode } from './components/BlockquoteNode/BlockquoteNode'
 export { CheckboxNode } from './components/CheckboxNode/CheckboxNode'
 export { CodeBlockNode } from './components/CodeBlockNode/CodeBlockNode'
 export { CodeBlockNode as ReactCodeBlockNode } from './components/CodeBlockNode/CodeBlockNode'
+export type { CodeBlockPreviewPayload, CodeBlockNodeReactEvents } from './components/CodeBlockNode/CodeBlockNode'
 export { HtmlPreviewFrame } from './components/CodeBlockNode/HtmlPreviewFrame'
 export type { HtmlPreviewFrameProps } from './components/CodeBlockNode/HtmlPreviewFrame'
 export type { D2Loader } from './components/D2BlockNode/d2'
@@ -65,6 +66,7 @@ export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
 export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'
 export type {
+  CodeBlockActionContext,
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,
   CodeBlockDiffHideUnchangedRegionsOptions,
@@ -80,10 +82,12 @@ export type {
   CodeBlockNodeProps,
   D2BlockNodeProps,
   ImageNodeProps,
+  InfographicBlockActionContext,
   InfographicBlockNodeProps,
   LinkNodeProps,
   MathBlockNodeProps,
   MathInlineNodeProps,
+  MermaidBlockActionContext,
   MermaidBlockEvent,
   MermaidBlockNodeProps,
   PreCodeNodeProps,

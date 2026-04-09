@@ -564,7 +564,12 @@ li .paragraph-node {
 }
 
 .mermaid-block {
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  --mermaid-header-bg: #f9fafb;
+  --mermaid-body-bg: #f9fafb;
+  --mermaid-text: #374151;
+  --mermaid-text-secondary: #4b5563;
+  --mermaid-border: #e5e7eb;
+  border: 1px solid var(--mermaid-border);
   border-radius: 1rem;
   background: #fff;
   color: #0f172a;
@@ -572,10 +577,119 @@ li .paragraph-node {
   overflow: hidden;
 }
 
+.mermaid-block.is-dark,
 .dark .mermaid-block {
+  --mermaid-header-bg: #1f2937;
+  --mermaid-body-bg: #111827;
+  --mermaid-text: #d1d5db;
+  --mermaid-text-secondary: #9ca3af;
+  --mermaid-border: rgba(55, 65, 81, 0.3);
   background: #0f172a;
   color: #e2e8f0;
-  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.mermaid-block-header {
+  background-color: var(--mermaid-header-bg);
+  border-bottom-color: var(--mermaid-border);
+}
+
+.mermaid-block-title {
+  color: var(--mermaid-text-secondary);
+}
+
+.mermaid-block-body {
+  background-color: var(--mermaid-body-bg);
+}
+
+.mermaid-block-source {
+  background-color: var(--mermaid-body-bg);
+  color: var(--mermaid-text);
+}
+
+.mermaid-zoom-btn {
+  color: var(--mermaid-text-secondary);
+}
+
+.mermaid-zoom-btn:hover {
+  background-color: var(--mermaid-header-bg);
+}
+
+/* ── Infographic block theme tokens ────────────────────────────────── */
+.infographic-block {
+  --infographic-header-bg: #f9fafb;
+  --infographic-body-bg: #f9fafb;
+  --infographic-text: #374151;
+  --infographic-text-secondary: #4b5563;
+  --infographic-border: #e5e7eb;
+  border-color: var(--infographic-border);
+}
+
+.infographic-block.is-dark {
+  --infographic-header-bg: #1f2937;
+  --infographic-body-bg: #111827;
+  --infographic-text: #d1d5db;
+  --infographic-text-secondary: #9ca3af;
+  --infographic-border: rgba(55, 65, 81, 0.3);
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.infographic-block-header {
+  background-color: var(--infographic-header-bg);
+  border-bottom-color: var(--infographic-border);
+}
+
+.infographic-block-title {
+  color: var(--infographic-text-secondary);
+}
+
+.infographic-block-body {
+  background-color: var(--infographic-body-bg);
+}
+
+.infographic-block-source {
+  background-color: var(--infographic-body-bg);
+  color: var(--infographic-text);
+}
+
+.infographic-action-btn {
+  color: var(--infographic-text-secondary);
+}
+
+.infographic-action-btn:hover {
+  background-color: var(--infographic-header-bg);
+}
+
+.infographic-zoom-btn {
+  color: var(--infographic-text-secondary);
+}
+
+.infographic-zoom-btn:hover {
+  background-color: var(--infographic-header-bg);
+}
+
+.infographic-mode-toggle {
+  background-color: var(--infographic-header-bg);
+}
+
+.infographic-mode-btn {
+  color: var(--infographic-text-secondary);
+}
+
+.infographic-mode-btn.active {
+  background-color: var(--infographic-body-bg);
+  color: var(--infographic-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.infographic-modal-panel {
+  background: #fff;
+  color: #0f172a;
+}
+
+.infographic-modal-panel.is-dark {
+  background: #0f172a;
+  color: #e2e8f0;
 }
 
 .mermaid-modal-overlay {
@@ -588,19 +702,22 @@ li .paragraph-node {
 }
 
 .mermaid-modal-panel {
+  --mermaid-modal-bg: #fff;
+  --mermaid-modal-text: #0f172a;
+  --mermaid-modal-border: rgba(148, 163, 184, 0.25);
   position: relative;
   width: min(64rem, calc(100% - 2rem));
   margin: 2rem auto;
   border-radius: 0.75rem;
   overflow: hidden;
-  background: #fff;
-  color: #0f172a;
+  background: var(--mermaid-modal-bg);
+  color: var(--mermaid-modal-text);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
 }
 
 .mermaid-modal-panel.is-dark {
-  background: #0f172a;
-  color: #e2e8f0;
+  --mermaid-modal-bg: #0f172a;
+  --mermaid-modal-text: #e2e8f0;
 }
 
 .mermaid-modal-header {
@@ -608,11 +725,11 @@ li .paragraph-node {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  border-bottom: 1px solid var(--mermaid-modal-border);
 }
 
 .mermaid-modal-panel.is-dark .mermaid-modal-header {
-  border-bottom-color: rgba(148, 163, 184, 0.25);
+  border-bottom-color: var(--mermaid-modal-border);
 }
 
 .mermaid-modal-title {
@@ -1412,103 +1529,6 @@ li .paragraph-node {
   outline-offset: 2px;
 }
 
-.html-preview-frame__backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.html-preview-frame__backdrop--dark {
-  background-color: rgba(15, 23, 42, 0.8);
-}
-
-.html-preview-frame {
-  width: 80vw;
-  max-width: 960px;
-  height: 70vh;
-  background-color: #fff;
-  border-radius: 0.5rem;
-  overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-}
-
-.html-preview-frame--dark {
-  background-color: #020617;
-  color: #e5e7eb;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-}
-
-.html-preview-frame__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.html-preview-frame--dark .html-preview-frame__header {
-  border-bottom-color: rgba(148, 163, 184, 0.35);
-}
-
-.html-preview-frame__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.html-preview-frame__dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  background-color: #22c55e;
-}
-
-.html-preview-frame--dark .html-preview-frame__dot {
-  background-color: #4ade80;
-}
-
-.html-preview-frame__label {
-  white-space: nowrap;
-}
-
-.html-preview-frame__close {
-  border: none;
-  background: transparent;
-  font-size: 1.25rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.html-preview-frame__close--dark {
-  color: #e5e7eb;
-}
-
-.html-preview-frame__iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
-
-@media (max-width: 640px) {
-  .html-preview-frame {
-    width: 100vw;
-    height: 80vh;
-    border-radius: 0;
-  }
-}
-
 .ms-tooltip {
   position: fixed;
   padding: 0.4rem 0.65rem;
@@ -1637,4 +1657,157 @@ body > div[id^="dmermaid-"] {
   width: 100%;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* AQBot chat tuning */
+.markstream-react[data-custom-id="chat"] .paragraph-node {
+  margin: 0.5em 0;
+  line-height: 1.5;
+}
+
+.markstream-react[data-custom-id="chat"] {
+  min-width: 0;
+  color: var(--color-text);
+  --markstream-code-fallback-bg: #f8fafc;
+  --markstream-code-fallback-fg: #0f172a;
+  --markstream-code-border-color: rgba(148, 163, 184, 0.28);
+  --vscode-editor-background: #f8fafc;
+  --vscode-editor-foreground: #0f172a;
+  --vscode-editor-selectionBackground: rgba(15, 23, 42, 0.06);
+  --vscode-focusBorder: rgba(15, 23, 42, 0.12);
+}
+
+.markstream-react[data-custom-id="chat"] .inline-code {
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+}
+
+.markstream-react[data-custom-id="chat"].dark .inline-code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e5e7eb;
+}
+
+.markstream-react[data-custom-id="chat"].dark {
+  --markstream-code-fallback-bg: #282c34;
+  --markstream-code-fallback-fg: #abb2bf;
+  --markstream-code-border-color: rgba(255, 255, 255, 0.12);
+  --vscode-editor-background: #282c34;
+  --vscode-editor-foreground: #abb2bf;
+  --vscode-editor-selectionBackground: rgba(171, 178, 191, 0.14);
+  --vscode-focusBorder: rgba(255, 255, 255, 0.14);
+}
+
+.markstream-react[data-custom-id="chat"] .code-block,
+.markstream-react[data-custom-id="chat"] .code-block-node {
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.markstream-react[data-custom-id="chat"] .code-block,
+.markstream-react[data-custom-id="chat"] .code-block-node,
+.markstream-react[data-custom-id="chat"] .code-block-container,
+.markstream-react[data-custom-id="chat"] .code-block-body,
+.markstream-react[data-custom-id="chat"] .code-block-render {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.markstream-react[data-custom-id="chat"] .code-block-header,
+.markstream-react[data-custom-id="chat"] .code-block-footer {
+  background: rgba(241, 245, 249, 0.96);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+.markstream-react[data-custom-id="chat"] .code-block-badge {
+  background: rgba(15, 23, 42, 0.08);
+  color: #334155;
+}
+
+.markstream-react[data-custom-id="chat"] .code-block-btn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #334155;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.markstream-react[data-custom-id="chat"] .code-block-btn:hover {
+  background: rgba(15, 23, 42, 0.06);
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+.markstream-react[data-custom-id="chat"].dark .code-block,
+.markstream-react[data-custom-id="chat"].dark .code-block-node,
+.markstream-react[data-custom-id="chat"].dark .code-block-header,
+.markstream-react[data-custom-id="chat"].dark .code-block-footer,
+.markstream-react[data-custom-id="chat"].dark .code-block-btn {
+  background: #000000;
+}
+
+.markstream-react[data-custom-id="chat"].dark .code-block,
+.markstream-react[data-custom-id="chat"].dark .code-block-node,
+.markstream-react[data-custom-id="chat"].dark .code-block-header,
+.markstream-react[data-custom-id="chat"].dark .code-block-footer {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.markstream-react[data-custom-id="chat"].dark .code-block-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.markstream-react[data-custom-id="chat"].dark .code-block-btn {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.markstream-react[data-custom-id="chat"].dark .code-block-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.markstream-react[data-custom-id="chat"] .code-block-container {
+  --markstream-diff-focus: rgba(15, 23, 42, 0.12);
+}
+
+.markstream-react[data-custom-id="chat"].dark .code-block-container.is-dark {
+  --markstream-code-fallback-bg: #000000;
+  --markstream-code-fallback-fg: #f8fafc;
+  --markstream-code-border-color: rgba(255, 255, 255, 0.12);
+  --markstream-code-fallback-selection-bg: rgba(255, 255, 255, 0.08);
+  --markstream-diff-frame-border: rgba(255, 255, 255, 0.12);
+  --markstream-diff-frame-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.84);
+  --markstream-diff-shell-fg: #f8fafc;
+  --markstream-diff-shell-muted: rgba(248, 250, 252, 0.68);
+  --markstream-diff-shell-border: rgba(255, 255, 255, 0.12);
+  --markstream-diff-shell-shadow: 0 34px 80px -52px rgba(0, 0, 0, 0.72);
+  --markstream-diff-shell-bg: #000000;
+  --markstream-diff-header-border: rgba(255, 255, 255, 0.12);
+  --markstream-diff-stage-bg: #000000;
+  --markstream-diff-editor-bg: #000000;
+  --markstream-diff-editor-fg: #f8fafc;
+  --markstream-diff-unchanged-fg: rgba(248, 250, 252, 0.92);
+  --markstream-diff-unchanged-bg: rgba(255, 255, 255, 0.04);
+  --markstream-diff-unchanged-divider: rgba(255, 255, 255, 0.12);
+  --markstream-diff-focus: rgba(255, 255, 255, 0.14);
+  --markstream-diff-widget-shadow: rgba(0, 0, 0, 0.72);
+  --markstream-diff-action-hover: rgba(255, 255, 255, 0.08);
+  --markstream-diff-panel-bg: #000000;
+  --markstream-diff-panel-bg-soft: #000000;
+  --markstream-diff-panel-bg-strong: #000000;
+  --markstream-diff-panel-border: rgba(255, 255, 255, 0.12);
+  --markstream-diff-pane-divider: rgba(255, 255, 255, 0.12);
+  --markstream-diff-gutter-bg: #000000;
+  --markstream-diff-gutter-guide: rgba(255, 255, 255, 0.08);
+  --markstream-diff-line-number: rgba(248, 250, 252, 0.58);
+  --markstream-diff-line-number-active: rgba(248, 250, 252, 0.88);
+  --markstream-diff-added-fg: rgba(248, 250, 252, 0.88);
+  --markstream-diff-removed-fg: rgba(248, 250, 252, 0.88);
+  --markstream-diff-added-line: rgba(255, 255, 255, 0.04);
+  --markstream-diff-removed-line: rgba(255, 255, 255, 0.04);
+  --markstream-diff-added-inline: rgba(255, 255, 255, 0.06);
+  --markstream-diff-removed-inline: rgba(255, 255, 255, 0.06);
+  --markstream-diff-added-inline-border: transparent;
+  --markstream-diff-removed-inline-border: transparent;
+  --markstream-diff-added-line-fill: rgba(255, 255, 255, 0.04);
+  --markstream-diff-removed-line-fill: rgba(255, 255, 255, 0.04);
 }

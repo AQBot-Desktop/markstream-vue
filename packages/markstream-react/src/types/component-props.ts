@@ -1,3 +1,4 @@
+import type React from 'react'
 import type { CodeBlockNode } from 'stream-markdown-parser'
 
 export interface CodeBlockMonacoThemeObject {
@@ -79,6 +80,28 @@ export interface CodeBlockMonacoOptions {
   [key: string]: any
 }
 
+export interface CodeBlockActionContext {
+  collapsed: boolean
+  copied: boolean
+  expanded: boolean
+  fontSize: number
+  defaultFontSize: number
+  isDark: boolean
+  language: string
+  displayLanguage: string
+  languageIcon: string
+  isPreviewable: boolean
+  code: string
+  toggleCollapse: () => void
+  copy: () => Promise<void>
+  toggleExpand: () => void
+  setFontSize: (size: number) => void
+  resetFontSize: () => void
+  decreaseFontSize: () => void
+  increaseFontSize: () => void
+  previewCode: () => void
+}
+
 export interface CodeBlockNodeProps {
   node: CodeBlockNode
   isDark?: boolean
@@ -100,6 +123,8 @@ export interface CodeBlockNodeProps {
   showFontSizeButtons?: boolean
   showTooltips?: boolean
   customId?: string
+  renderHeaderActions?: (context: CodeBlockActionContext) => React.ReactNode
+  renderHeader?: (context: CodeBlockActionContext) => React.ReactNode
 }
 
 export interface ImageNodeProps {
@@ -143,6 +168,26 @@ export interface PreCodeNodeProps {
   node: CodeBlockNode
 }
 
+export interface MermaidBlockActionContext {
+  collapsed: boolean
+  copied: boolean
+  showSource: boolean
+  modalOpen: boolean
+  isDark: boolean
+  code: string
+  mermaidAvailable: boolean
+  isExportDisabled: boolean
+  zoom: number
+  toggleCollapse: () => void
+  copy: () => void
+  exportSvg: () => void
+  toggleFullscreen: () => void
+  switchMode: (mode: 'preview' | 'source') => void
+  zoomIn: () => void
+  zoomOut: () => void
+  resetZoom: () => void
+}
+
 export interface MermaidBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
@@ -168,6 +213,10 @@ export interface MermaidBlockNodeProps {
   isStrict?: boolean
   showTooltips?: boolean
   onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void
+  renderHeader?: (ctx: MermaidBlockActionContext) => React.ReactNode
+  renderHeaderActions?: (ctx: MermaidBlockActionContext) => React.ReactNode
+  renderModeToggle?: (ctx: MermaidBlockActionContext) => React.ReactNode
+  renderZoomControls?: (ctx: MermaidBlockActionContext) => React.ReactNode
 }
 
 export interface MermaidBlockEvent<TPayload = any> {
@@ -213,6 +262,25 @@ export interface MathInlineNodeProps {
   }
 }
 
+export interface InfographicBlockActionContext {
+  collapsed: boolean
+  copied: boolean
+  showSource: boolean
+  modalOpen: boolean
+  isDark: boolean
+  code: string
+  isExportDisabled: boolean
+  zoom: number
+  toggleCollapse: () => void
+  copy: () => void
+  exportSvg: () => void
+  toggleFullscreen: () => void
+  switchMode: (mode: 'preview' | 'source') => void
+  zoomIn: () => void
+  zoomOut: () => void
+  resetZoom: () => void
+}
+
 export interface InfographicBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
@@ -225,4 +293,8 @@ export interface InfographicBlockNodeProps {
   showExportButton?: boolean
   showFullscreenButton?: boolean
   showZoomControls?: boolean
+  renderHeader?: (ctx: InfographicBlockActionContext) => React.ReactNode
+  renderHeaderActions?: (ctx: InfographicBlockActionContext) => React.ReactNode
+  renderModeToggle?: (ctx: InfographicBlockActionContext) => React.ReactNode
+  renderZoomControls?: (ctx: InfographicBlockActionContext) => React.ReactNode
 }

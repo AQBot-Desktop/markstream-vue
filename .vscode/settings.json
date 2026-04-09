@@ -1,3 +1,7 @@
 {
-  "unot.switchMagic": true
+  "unot.switchMagic": true,
+  "i18n-ally.localesPaths": [
+    "packages/markstream-angular/src/i18n",
+    "packages/markstream-react/src/i18n"
+  ]
 }
