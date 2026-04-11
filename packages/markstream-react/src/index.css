@@ -1465,8 +1465,8 @@ li .paragraph-node {
   background: transparent;
   color: inherit;
   /* Match Monaco defaults to avoid a jarring swap while it loads */
-  font-size: var(--vscode-editor-font-size, 12px);
-  line-height: var(--vscode-editor-line-height, 18px);
+  font-size: var(--vscode-editor-font-size, 14px);
+  line-height: var(--vscode-editor-line-height, 19px);
   font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
   font-weight: var(--vscode-editor-font-weight, 400);
 }

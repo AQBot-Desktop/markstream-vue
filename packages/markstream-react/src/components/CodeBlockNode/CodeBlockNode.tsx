@@ -85,8 +85,11 @@ function resolveDiffHideUnchangedRegionsOption(value: unknown) {
 
 function resolveCodeBlockMonacoOptions(isDiff: boolean, monacoOptions: CodeBlockNodeProps['monacoOptions']) {
   const raw = monacoOptions ? { ...(monacoOptions as Record<string, any>) } : {}
-  if (!isDiff)
+  if (!isDiff) {
+    if (!('fontSize' in raw) || !raw.fontSize)
+      raw.fontSize = 14
     return raw
+  }
 
   const diffHideUnchangedRegions = raw.diffHideUnchangedRegions === undefined
     ? { ...defaultDiffHideUnchangedRegions }
