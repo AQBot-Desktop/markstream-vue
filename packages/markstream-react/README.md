@@ -74,6 +74,28 @@ Notes:
 - These props are forwarded to the built-in Mermaid / D2 / Infographic blocks and to custom `mermaid` / `d2` / `infographic` overrides registered with `setCustomComponents(...)`.
 - `viewportPriority` applies to those heavy nodes too, so offscreen graphs will not keep doing background work while the text stream is still updating.
 
+## Language-specific code block overrides
+
+You can register a custom component under a fenced language key without wrapping the generic `code_block` renderer:
+
+```tsx
+import type { NodeComponentProps } from 'markstream-react'
+import { setCustomComponents } from 'markstream-react'
+
+function EChartsBlockNode(props: NodeComponentProps<any>) {
+  return <div data-language={String(props.node?.language)}>{String(props.node?.code || '')}</div>
+}
+
+setCustomComponents('docs', {
+  echarts: EChartsBlockNode,
+})
+```
+
+Notes:
+- `echarts` only catches fences whose language is `echarts`.
+- Code block routing priority is exact language key -> built-in `mermaid` / `d2` / `infographic` routes -> `code_block`.
+- Custom `mermaid` / `d2` / `infographic` overrides keep their specialized top-level props; other custom language keys use the normal custom component contract (`node`, `ctx`, `renderNode`, and friends).
+
 ## Mermaid tuning
 
 Common `mermaidProps` keys for streaming scenarios:

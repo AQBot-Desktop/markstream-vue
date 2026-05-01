@@ -19,8 +19,8 @@ If you are still deciding where to customize the pipeline, start with:
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
 | `MarkdownRender` | Rendering full AST trees (default export) | Props: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags`, `is-dark`, `code-block-props`, `mermaid-props`, `d2-props`, `infographic-props`; events: `copy`, `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Use `setCustomComponents(customId, mapping)` + `custom-id` to scope overrides; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right`; diff hover actions live under `monacoOptions` (`diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, `onDiffHunkAction`) | Install `stream-monaco` (peer) + bundle Monaco workers | SSR sends a `<pre><code>` fallback first; blank editor => check worker bundling + client enhancement setup |
-| `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
-| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` >= 11; no extra CSS required | SSR sends readable fallback markup first; for async errors see `/guide/mermaid` |
+| `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
+| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`, `estimatedPreviewHeightPx`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` >= 11; no extra CSS required | SSR sends readable fallback markup first; for async errors see `/guide/mermaid` |
 | `D2BlockNode` | Progressive D2 diagrams | `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`; toolbar toggles | Peer `@terrastruct/d2`; no extra CSS | SSR sends fallback/source first; missing peer stays on fallback; see `/guide/d2` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR can emit KaTeX HTML when you register a sync loader; otherwise it falls back to raw text |
 | `ImageNode` | Custom previews/lightboxes | Props: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`; emits `click`, `load`, `error` | None, but respects global CSS | Wrap in a custom component + `setCustomComponents` to intercept events |
@@ -230,13 +230,13 @@ Deep dive: [CodeBlockNode](/guide/code-block-node), [Monaco](/guide/monaco)
 
 ## MarkdownCodeBlockNode
 
-> Lightweight syntax-highlighted code block renderer powered by `shiki` and `stream-markdown`.
+> Lightweight syntax-highlighted code block renderer powered by Shiki via `stream-markdown`.
 
 - **Best for**: SSR-friendly docs, blog-style pages, smaller bundles
 - **Key props**: `node`, `stream`, `loading`
 - **Slots**: `header-left`, `header-right`
-- **Peers**: `shiki`, `stream-markdown`
-- **Common gotcha**: if highlighting never appears, confirm both peers are installed and loaded in the environment where rendering happens
+- **Peers**: `stream-markdown`
+- **Common gotcha**: if highlighting never appears, confirm `stream-markdown` is installed and loaded in the environment where rendering happens
 
 Choose this when you do not need Monaco's editing surface or diff interactions.
 
@@ -245,10 +245,12 @@ Choose this when you do not need Monaco's editing surface or diff interactions.
 > Progressive Mermaid renderer with copy/export/modal hooks.
 
 - **Best for**: large Mermaid graphs, AI-generated diagrams, user-triggered export
-- **Key props**: `node`, `isDark`, `isStrict`, `maxHeight`
+- **Key props**: `node`, `isDark`, `isStrict`, `maxHeight`, `estimatedPreviewHeightPx`
 - **Events**: `copy`, `export`, `openModal`, `toggleMode`
 - **Peer**: `mermaid` >= 11
 - **Common gotcha**: treat Mermaid as client enhancement; SSR already returns fallback markup, but preview rendering still initializes on the client
+
+`MarkdownRender` estimates `estimatedPreviewHeightPx` for Mermaid fences when callers do not provide it. Pass it manually only when rendering `MermaidBlockNode` directly or when a custom `mermaid` renderer already knows the first-preview height.
 
 Deep dive: [Mermaid](/guide/mermaid), [MermaidBlockNode](/guide/mermaid-block-node)
 

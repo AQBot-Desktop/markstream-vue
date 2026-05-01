@@ -5,6 +5,7 @@ import { NodeRenderer, setCustomComponents, setKaTeXWorker, setMermaidWorker } f
 import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker&inline'
 import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&inline'
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PLAYGROUND_CUSTOM_HTML_TAGS, PLAYGROUND_CUSTOM_ID } from '../../playground-react18/src/shared/markstreamPlayground'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../../playground-react18/src/shared/streamPresets'
 import { TestLab } from '../../playground-react18/src/shared/TestLab'
 import { useChatAutoScroll } from '../../playground-react18/src/shared/useChatAutoScroll'
@@ -14,7 +15,6 @@ import { streamContent } from './markdown'
 
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
-const PLAYGROUND_CUSTOM_ID = 'playground-demo'
 setCustomComponents(PLAYGROUND_CUSTOM_ID, {
   thinking: ThinkingNode,
 })
@@ -719,6 +719,7 @@ export default function App() {
                 themes={themeOptions}
                 isDark={isDark}
                 customId={PLAYGROUND_CUSTOM_ID}
+                customHtmlTags={PLAYGROUND_CUSTOM_HTML_TAGS}
                 deferNodesUntilVisible={false}
                 maxLiveNodes={2000}
                 liveNodeBuffer={200}

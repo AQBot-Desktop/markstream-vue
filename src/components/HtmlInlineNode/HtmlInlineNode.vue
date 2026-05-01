@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtmlContent } from 'stream-markdown-parser'
 import { computed, defineComponent } from 'vue'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
@@ -55,12 +56,12 @@ const renderMode = computed(() => {
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content }
+    return { mode: 'html', content: sanitizeHtmlContent(content) }
 
   // Parse and build VNode tree
   const nodes = parseHtmlToVNodes(content, customComponents.value)
   if (nodes === null)
-    return { mode: 'html', content } // Fallback to DOM rendering if parsing fails
+    return { mode: 'html', content: sanitizeHtmlContent(content) } // Fallback to sanitized DOM rendering if parsing fails
 
   return { mode: 'dynamic', nodes }
 })

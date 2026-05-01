@@ -7,6 +7,7 @@
 - `isDark?: boolean` — 暗色模式开关
 - `loading?: boolean` — 初始加载占位
 - `maxHeight?: string | null` — 最大高度
+- `estimatedPreviewHeightPx?: number` — Mermaid 完成渲染前预留的首屏 preview 高度；通过 `MarkdownRender` 渲染 Mermaid 围栏时会自动填入
 - `isStrict?: boolean` — 开启 `securityLevel: 'strict'` + DOMPurify，并禁用 HTML labels；用于渲染不可信的 Mermaid 输入（例如用户/LLM 生成的内容），防止 `<script>`、`javascript:` 链接或内联事件落入最终 SVG
 - Header/按钮控制（全部可选，默认 `true`）:
   - `showHeader` / `showModeToggle` / `showCopyButton` / `showExportButton` / `showFullscreenButton` / `showCollapseButton` / `showZoomControls` / `showTooltips`

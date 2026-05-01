@@ -18,7 +18,8 @@ const isDark = ref(
   typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
 )
 // Sync initial state to DOM
-if (isDark.value) document.documentElement.classList.add('dark')
+if (isDark.value)
+  document.documentElement.classList.add('dark')
 
 function toggleDark() {
   isDark.value = !isDark.value
@@ -27,15 +28,61 @@ function toggleDark() {
 
 const activeTheme = ref('')
 const themeList = [
-  '', 'airbnb', 'airtable', 'apple', 'bmw', 'cal', 'claude', 'clay',
-  'clickhouse', 'cohere', 'coinbase', 'composio', 'cursor', 'elevenlabs',
-  'expo', 'figma', 'framer', 'hashicorp', 'ibm', 'intercom', 'kraken',
-  'linear', 'lovable', 'minimax', 'mintlify', 'miro', 'mistral', 'mongodb',
-  'notion', 'nvidia', 'ollama', 'opencode-ai', 'pinterest', 'posthog',
-  'raycast', 'replicate', 'resend', 'revolut', 'runwayml', 'sanity',
-  'sentry', 'spacex', 'spotify', 'stripe', 'supabase', 'superhuman',
-  'together-ai', 'uber', 'vercel', 'voltagent', 'warp', 'webflow',
-  'wise', 'x-ai', 'zapier',
+  '',
+  'airbnb',
+  'airtable',
+  'apple',
+  'bmw',
+  'cal',
+  'claude',
+  'clay',
+  'clickhouse',
+  'cohere',
+  'coinbase',
+  'composio',
+  'cursor',
+  'elevenlabs',
+  'expo',
+  'figma',
+  'framer',
+  'hashicorp',
+  'ibm',
+  'intercom',
+  'kraken',
+  'linear',
+  'lovable',
+  'minimax',
+  'mintlify',
+  'miro',
+  'mistral',
+  'mongodb',
+  'notion',
+  'nvidia',
+  'ollama',
+  'opencode-ai',
+  'pinterest',
+  'posthog',
+  'raycast',
+  'replicate',
+  'resend',
+  'revolut',
+  'runwayml',
+  'sanity',
+  'sentry',
+  'spacex',
+  'spotify',
+  'stripe',
+  'supabase',
+  'superhuman',
+  'together-ai',
+  'uber',
+  'vercel',
+  'voltagent',
+  'warp',
+  'webflow',
+  'wise',
+  'x-ai',
+  'zapier',
 ]
 
 // ── Color palette data ──
@@ -361,7 +408,9 @@ Term 2
           v-model="activeTheme"
           class="px-2 py-1 text-xs border border-[hsl(var(--ms-border))] rounded-md bg-[hsl(var(--ms-background))] text-inherit cursor-pointer"
         >
-          <option value="">Default</option>
+          <option value="">
+            Default
+          </option>
           <option v-for="t in themeList.filter(Boolean)" :key="t" :value="t">
             {{ t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') }}
           </option>
@@ -372,7 +421,9 @@ Term 2
         >
           {{ isDark ? 'Light' : 'Dark' }}
         </button>
-        <router-link to="/" class="text-xs text-[var(--link-color)] no-underline hover:underline">&larr; Playground</router-link>
+        <router-link to="/" class="text-xs text-[var(--link-color)] no-underline hover:underline">
+          &larr; Playground
+        </router-link>
       </div>
     </header>
 
@@ -383,9 +434,13 @@ Term 2
 
       <!-- Color Palette -->
       <section class="palette-section">
-        <h2 class="palette-title">Color Palette</h2>
+        <h2 class="palette-title">
+          Color Palette
+        </h2>
         <div v-for="group in palette" :key="group.title" class="palette-group">
-          <h3 class="palette-group-title">{{ group.title }}</h3>
+          <h3 class="palette-group-title">
+            {{ group.title }}
+          </h3>
           <div class="palette-row">
             <div v-for="token in group.tokens" :key="token.name" class="palette-item">
               <div
@@ -394,7 +449,9 @@ Term 2
                   backgroundColor: `hsl(var(${token.bg}))`,
                   color: `hsl(var(${token.fg}))`,
                 }"
-              >Aa</div>
+              >
+                Aa
+              </div>
               <span class="palette-label">{{ token.name }}</span>
               <span class="palette-var">{{ token.bg.replace('--ms-', '') }}</span>
             </div>
@@ -419,7 +476,9 @@ Term 2
       />
 
       <!-- Shiki-rendered code block (lightweight, no Monaco) -->
-      <h2 class="text-xl font-semibold mt-8 mb-4">Shiki Code Block</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">
+        Shiki Code Block
+      </h2>
       <MarkdownCodeBlockNode
         :node="shikiNode"
         :is-dark="isDark"

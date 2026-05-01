@@ -10,6 +10,7 @@ import {
   ViewChild,
 } from '@angular/core'
 import { getKatex } from '../../optional/katex'
+import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 import { getString } from '../shared/node-helpers'
 
@@ -61,7 +62,7 @@ export class MathBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
     if (!target)
       return
 
-    const content = this.content
+    const content = normalizeKaTeXRenderInput(this.content)
     const version = ++this.renderVersion
     if (!content) {
       target.textContent = ''

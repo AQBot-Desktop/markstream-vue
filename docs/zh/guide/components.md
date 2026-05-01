@@ -19,8 +19,8 @@ description: 快速查阅 MarkdownRender、CodeBlockNode、MermaidBlockNode、Im
 | ---- | -------- | ---------------- | ------------------- | -------- |
 | `MarkdownRender` | 渲染完整 AST（默认导出） | Props：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`、`is-dark`、`code-block-props`、`mermaid-props`、`d2-props`、`infographic-props`；事件：`copy`、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 用 `setCustomComponents(customId, mapping)` + `custom-id` 限定覆盖范围；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right`；diff 悬浮操作配置放在 `monacoOptions`（`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction`） | 安装 `stream-monaco`（peer）并打包 Monaco workers | SSR 首包会先给 `<pre><code>` fallback；编辑器空白时优先检查 worker 打包和客户端增强链路 |
-| `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
-| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` >= 11；无需额外 CSS | SSR 首包先给可读 fallback；异步渲染问题详见 `/zh/guide/mermaid` |
+| `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `stream-markdown` | SSR/低体积场景优先使用 |
+| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`、`estimatedPreviewHeightPx`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` >= 11；无需额外 CSS | SSR 首包先给可读 fallback；异步渲染问题详见 `/zh/guide/mermaid` |
 | `D2BlockNode` | 渐进式 D2 图 | `node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`；工具栏开关 | `@terrastruct/d2`；无需额外 CSS | SSR 首包先给 fallback / 源码；缺少依赖时保持 fallback；详见 `/zh/guide/d2` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | 注册同步 KaTeX loader 后可直接 SSR 出 HTML；否则稳定回退为原文 |
 | `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
@@ -230,13 +230,13 @@ setCustomComponents('docs', {
 
 ## MarkdownCodeBlockNode
 
-> 基于 `shiki` 和 `stream-markdown` 的轻量代码块渲染器。
+> 基于 Shiki 和 `stream-markdown` 的轻量代码块渲染器。
 
 - **适合**：SSR 友好的文档站、博客页、更小的打包体积
 - **关键 props**：`node`、`stream`、`loading`
 - **插槽**：`header-left`、`header-right`
-- **同伴依赖**：`shiki`、`stream-markdown`
-- **常见问题**：一直没有高亮时，先确认两个 peers 都已安装，并在实际渲染环境里可用
+- **同伴依赖**：`stream-markdown`
+- **常见问题**：一直没有高亮时，先确认 `stream-markdown` 已安装，并在实际渲染环境里可用
 
 如果你不需要 Monaco 的编辑面板和 diff 交互，这个通常是更轻的选择。
 
@@ -245,10 +245,12 @@ setCustomComponents('docs', {
 > 渐进式 Mermaid 渲染器，带复制、导出、弹窗等交互能力。
 
 - **适合**：大图、AI 生成图表、用户主动导出
-- **关键 props**：`node`、`isDark`、`isStrict`、`maxHeight`
+- **关键 props**：`node`、`isDark`、`isStrict`、`maxHeight`、`estimatedPreviewHeightPx`
 - **事件**：`copy`、`export`、`openModal`、`toggleMode`
 - **同伴依赖**：`mermaid` >= 11
 - **常见问题**：把 Mermaid 当成客户端增强能力看待；SSR 首包已经有 fallback，真正的 preview 仍然在客户端初始化
+
+`MarkdownRender` 会在调用方未传入时为 Mermaid 围栏估算 `estimatedPreviewHeightPx`。只有在直接使用 `MermaidBlockNode`，或自定义 `mermaid` 渲染器已经知道首屏 preview 高度时，才需要手动传入。
 
 深入页面： [Mermaid](/zh/guide/mermaid)、[MermaidBlockNode](/zh/guide/mermaid-block-node)
 

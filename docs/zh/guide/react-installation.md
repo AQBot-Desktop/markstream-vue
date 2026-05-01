@@ -26,7 +26,7 @@ markstream-react 通过可选的对等依赖支持各种功能。只安装你需
 
 | 功能 | 所需包 | 安装命令 |
 |---------|------------------|-----------------|
-| Shiki 代码块（`MarkdownCodeBlockNode`） | `shiki`、`stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki 代码块（`MarkdownCodeBlockNode`） | `stream-markdown` | `pnpm add stream-markdown` |
 | Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
 | D2 图表 | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
@@ -82,22 +82,22 @@ module.exports = {
 一次性启用所有功能：
 
 ```bash
-pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+pnpm add stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 # 或
-npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+npm install stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ### 功能详情
 
 #### 代码语法高亮
 
-需要同时安装 `shiki` 和 `stream-markdown`：
+需要安装 `stream-markdown`：
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 ```
 
-这些包用于 Shiki 版的 `MarkdownCodeBlockNode`。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
+`stream-markdown` 已内置 `MarkdownCodeBlockNode` 所需的 Shiki runtime。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
 
 ```tsx
 import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-react'

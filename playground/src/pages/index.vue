@@ -176,15 +176,61 @@ const toggleTheme = useToggle(isDark)
 // Brand theme selector
 const activeBrandTheme = ref('')
 const brandThemes = [
-  '', 'airbnb', 'airtable', 'apple', 'bmw', 'cal', 'claude', 'clay',
-  'clickhouse', 'cohere', 'coinbase', 'composio', 'cursor', 'elevenlabs',
-  'expo', 'figma', 'framer', 'hashicorp', 'ibm', 'intercom', 'kraken',
-  'linear', 'lovable', 'minimax', 'mintlify', 'miro', 'mistral', 'mongodb',
-  'notion', 'nvidia', 'ollama', 'opencode-ai', 'pinterest', 'posthog',
-  'raycast', 'replicate', 'resend', 'revolut', 'runwayml', 'sanity',
-  'sentry', 'spacex', 'spotify', 'stripe', 'supabase', 'superhuman',
-  'together-ai', 'uber', 'vercel', 'voltagent', 'warp', 'webflow',
-  'wise', 'x-ai', 'zapier',
+  '',
+  'airbnb',
+  'airtable',
+  'apple',
+  'bmw',
+  'cal',
+  'claude',
+  'clay',
+  'clickhouse',
+  'cohere',
+  'coinbase',
+  'composio',
+  'cursor',
+  'elevenlabs',
+  'expo',
+  'figma',
+  'framer',
+  'hashicorp',
+  'ibm',
+  'intercom',
+  'kraken',
+  'linear',
+  'lovable',
+  'minimax',
+  'mintlify',
+  'miro',
+  'mistral',
+  'mongodb',
+  'notion',
+  'nvidia',
+  'ollama',
+  'opencode-ai',
+  'pinterest',
+  'posthog',
+  'raycast',
+  'replicate',
+  'resend',
+  'revolut',
+  'runwayml',
+  'sanity',
+  'sentry',
+  'spacex',
+  'spotify',
+  'stripe',
+  'supabase',
+  'superhuman',
+  'together-ai',
+  'uber',
+  'vercel',
+  'voltagent',
+  'warp',
+  'webflow',
+  'wise',
+  'x-ai',
+  'zapier',
 ]
 
 // Code block theme selector (single dropdown)
@@ -410,607 +456,930 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="markstream-vue flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-[hsl(var(--ms-background))]" :class="{ dark: isDark }" :data-theme="activeBrandTheme || undefined">
-    <!-- 设置按钮和面板 -->
-    <div class="fixed top-4 right-4 z-10">
-      <button
-        v-if="isCompactSettings"
-        class="
-          settings-toggle w-10 h-10 rounded-full
-          bg-[hsl(var(--ms-background)/0.95)]
-          backdrop-blur-md border border-[hsl(var(--ms-border)/0.5)]
-          hover:bg-[hsl(var(--ms-accent))]
-          shadow-lg
-          transition-all duration-200 flex items-center justify-center
-          focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
-        "
-        :class="{ 'ring-2 ring-[hsl(var(--ms-ring)/0.5)]': showSettings }"
-        @click="showSettings = !showSettings"
-      >
-        <Icon
-          icon="carbon:settings"
-          class="w-5 h-5 text-[hsl(var(--ms-muted-foreground))] transition-transform duration-200"
-          :class="{ 'rotate-90': showSettings }"
-        />
-      </button>
-
-      <Transition
-        enter-active-class="transition ease-out duration-300"
-        enter-from-class="opacity-0 scale-95 translate-y-2"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-active-class="transition ease-in duration-200"
-        leave-from-class="opacity-100 scale-100 translate-y-0"
-        leave-to-class="opacity-0 scale-95 translate-y-2"
-      >
-        <div
-          v-if="shouldShowSettingsPanel"
-          class="
-            settings-panel
-            bg-[hsl(var(--ms-background)/0.95)]
-            backdrop-blur-md border border-[hsl(var(--ms-border)/0.5)]
-            rounded-xl shadow-xl
-            p-4 space-y-4 min-w-[220px] w-[280px]
-            overflow-y-auto
-            origin-top-right
-          "
-          :class="isCompactSettings ? 'absolute top-12 right-0 mt-2 max-h-[calc(100vh-5rem)]' : 'max-h-[calc(100vh-2rem)]'"
-          @click.stop
-        >
-          <div v-if="!isCompactSettings" class="flex items-center gap-2 border-b border-[hsl(var(--ms-border))] pb-2">
-            <Icon
-              icon="carbon:settings"
-              class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
-            />
-            <span class="text-xs font-semibold uppercase tracking-[0.24em] text-[hsl(var(--ms-muted-foreground))]">Settings</span>
-          </div>
-
-          <!-- 品牌主题选择器 -->
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Brand Theme
-            </label>
-            <div class="relative">
-              <select
-                v-model="activeBrandTheme"
-                class="
-                  w-full appearance-none px-3 py-2 pr-8
-                  bg-[hsl(var(--ms-muted))]
-                  border border-[hsl(var(--ms-border))]
-                  rounded-lg text-sm font-medium
-                  text-[hsl(var(--ms-foreground))]
-                  hover:bg-[hsl(var(--ms-accent))]
-                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
-                  transition-all duration-200 cursor-pointer
-                "
-              >
-                <option value="">Default</option>
-                <option v-for="t in brandThemes.filter(Boolean)" :key="t" :value="t">
-                  {{ t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') }}
-                </option>
-              </select>
-              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                <Icon
-                  icon="carbon:chevron-down"
-                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Code block 主题选择器 -->
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Code Theme
-            </label>
-            <div class="relative">
-              <select
-                v-model="selectedTheme"
-                class="
-                  w-full appearance-none px-3 py-2 pr-8
-                  bg-[hsl(var(--ms-muted))]
-                  border border-[hsl(var(--ms-border))]
-                  rounded-lg text-sm font-medium
-                  text-[hsl(var(--ms-foreground))]
-                  hover:bg-[hsl(var(--ms-accent))]
-                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
-                  transition-all duration-200 cursor-pointer
-                "
-                aria-label="Code block theme"
-                @click.stop
-                @change.stop
-              >
-                <option v-for="t in themes" :key="t" :value="t">
-                  {{ formatThemeName(t) }}
-                </option>
-              </select>
-              <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <Icon
-                  icon="carbon:chevron-down"
-                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- 流式速度控制 -->
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Stream Profile
-            </label>
-            <div class="relative">
-              <select
-                v-model="selectedStreamPresetId"
-                class="
-                  w-full appearance-none px-3 py-2 pr-8
-                  bg-[hsl(var(--ms-muted))]
-                  border border-[hsl(var(--ms-border))]
-                  rounded-lg text-sm font-medium
-                  text-[hsl(var(--ms-foreground))]
-                  hover:bg-[hsl(var(--ms-accent))]
-                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
-                  transition-all duration-200 cursor-pointer
-                "
-              >
-                <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
-                  {{ preset.label }}
-                </option>
-                <option :value="CUSTOM_STREAM_PRESET_ID">
-                  Custom
-                </option>
-              </select>
-              <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <Icon
-                  icon="carbon:chevron-down"
-                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
-                />
-              </div>
-            </div>
-            <p class="text-[11px] leading-5 text-[hsl(var(--ms-muted-foreground))]">
-              {{ streamPresetDescription }}
-            </p>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Transport
-            </label>
-            <div class="relative">
-              <select
-                v-model="streamTransportMode"
-                class="
-                  w-full appearance-none px-3 py-2 pr-8
-                  bg-[hsl(var(--ms-muted))]
-                  border border-[hsl(var(--ms-border))]
-                  rounded-lg text-sm font-medium
-                  text-[hsl(var(--ms-foreground))]
-                  hover:bg-[hsl(var(--ms-accent))]
-                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
-                  transition-all duration-200 cursor-pointer
-                "
-              >
-                <option value="readable-stream">
-                  ReadableStream
-                </option>
-                <option value="scheduler">
-                  Scheduler
-                </option>
-              </select>
-              <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <Icon
-                  icon="carbon:chevron-down"
-                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Slice Mode
-            </label>
-            <div class="relative">
-              <select
-                v-model="streamSliceMode"
-                class="
-                  w-full appearance-none px-3 py-2 pr-8
-                  bg-[hsl(var(--ms-muted))]
-                  border border-[hsl(var(--ms-border))]
-                  rounded-lg text-sm font-medium
-                  text-[hsl(var(--ms-foreground))]
-                  hover:bg-[hsl(var(--ms-accent))]
-                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
-                  transition-all duration-200 cursor-pointer
-                "
-              >
-                <option value="pure-random">
-                  Pure Random
-                </option>
-                <option value="boundary-aware">
-                  Boundary Aware
-                </option>
-              </select>
-              <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <Icon
-                  icon="carbon:chevron-down"
-                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              chunkDelayMin
-            </label>
-            <div class="flex items-center gap-3">
-              <input
-                v-model.number="streamChunkDelayMin"
-                type="range"
-                min="8"
-                max="240"
-                step="4"
-                class="flex-1 cursor-pointer"
-              >
-              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
-                {{ normalizedChunkDelayRange.min }}ms
-              </span>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              chunkDelayMax
-            </label>
-            <div class="flex items-center gap-3">
-              <input
-                v-model.number="streamChunkDelayMax"
-                type="range"
-                min="8"
-                max="240"
-                step="4"
-                class="flex-1 cursor-pointer"
-              >
-              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
-                {{ normalizedChunkDelayRange.max }}ms
-              </span>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              chunkSizeMin
-            </label>
-            <div class="flex items-center gap-3">
-              <input
-                v-model.number="streamChunkSizeMin"
-                type="range"
-                min="1"
-                max="24"
-                step="1"
-                class="flex-1 cursor-pointer"
-              >
-              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
-                {{ normalizedChunkSizeRange.min }}
-              </span>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              chunkSizeMax
-            </label>
-            <div class="flex items-center gap-3">
-              <input
-                v-model.number="streamChunkSizeMax"
-                type="range"
-                min="1"
-                max="24"
-                step="1"
-                class="flex-1 cursor-pointer"
-              >
-              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
-                {{ normalizedChunkSizeRange.max }}
-              </span>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Burstiness
-            </label>
-            <div class="flex items-center gap-3">
-              <input
-                v-model.number="streamBurstiness"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                class="flex-1 cursor-pointer"
-              >
-              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-12 text-right">
-                {{ normalizedBurstiness }}%
-              </span>
-            </div>
-          </div>
-
-          <p class="text-[11px] leading-5 text-[hsl(var(--ms-muted-foreground))]">
-            Active window: {{ streamChunkRangeLabel }} chars and {{ streamDelayRangeLabel }}. When min=max, the cadence becomes fixed.
-          </p>
-
-          <p class="text-[11px] leading-5 text-[hsl(var(--ms-muted-foreground))]">
-            `Pure Random` uses raw random `slice`; `Boundary Aware` snaps toward word and punctuation boundaries. `ReadableStream` is closest to the real reader path.
-          </p>
-
-          <!-- 分割线 -->
-          <div class="border-t border-[hsl(var(--ms-border))]" />
-
-          <!-- 主题切换 -->
-          <div class="flex items-center justify-between">
-            <label class="text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
-              Dark Mode
-            </label>
-            <button
-              class="
-                relative w-12 h-6 rounded-full
-                focus:outline-none focus:ring-2 focus:ring-blue-500/50
-                hover:shadow-lg active:scale-95
-                transition-all duration-200 ease-out
-              "
-              :style="{
-                backgroundColor: isDark ? '#3b82f6' : '#e5e7eb',
-                transition: 'background-color 0.35s ease-out, box-shadow 0.2s ease, transform 0.1s ease',
-              }"
-              @click.stop="toggleTheme()"
-            >
-              <!-- 滑动圆点 -->
-              <div
-                class="
-                  absolute top-0.5 w-5 h-5 bg-white rounded-full
-                  flex items-center justify-center
-                  shadow-md hover:shadow-lg
-                "
-                :style="{
-                  left: isDark ? '26px' : '2px',
-                  transform: `scale(${isDark ? 1.02 : 1})`,
-                  transition: 'left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.2s ease-out, box-shadow 0.2s ease',
-                }"
-              >
-                <!-- 图标根据状态显示 -->
-                <Transition
-                  enter-active-class="transition-all duration-300 ease-out"
-                  leave-active-class="transition-all duration-200 ease-in"
-                  enter-from-class="opacity-0 scale-0 rotate-90"
-                  enter-to-class="opacity-100 scale-100 rotate-0"
-                  leave-from-class="opacity-100 scale-100 rotate-0"
-                  leave-to-class="opacity-0 scale-0 rotate-90"
-                  mode="out-in"
-                >
-                  <Icon
-                    v-if="isDark"
-                    key="moon"
-                    icon="carbon:moon"
-                    class="w-3 h-3 text-blue-600 drop-shadow-sm"
-                  />
-                  <Icon
-                    v-else
-                    key="sun"
-                    icon="carbon:sun"
-                    class="w-3 h-3 text-yellow-500 drop-shadow-sm"
-                  />
-                </Transition>
-              </div>
-            </button>
-          </div>
-        </div>
-      </Transition>
+  <div class="playground-root" :class="{ dark: isDark }" :data-theme="activeBrandTheme || undefined">
+    <!-- Background decorations -->
+    <div class="playground-bg">
+      <div class="playground-bg__orb playground-bg__orb--1" />
+      <div class="playground-bg__orb playground-bg__orb--2" />
+      <div class="playground-bg__orb playground-bg__orb--3" />
     </div>
 
-    <!-- Chatbot-style container -->
-    <div class="chatbot-container max-w-5xl w-full bg-[hsl(var(--ms-background))] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-[hsl(var(--ms-border))]">
-      <!-- Header -->
-      <div class="chatbot-header px-6 py-4 border-b border-[hsl(var(--ms-border))] bg-[hsl(var(--ms-muted))]">
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <Icon icon="carbon:chat" class="w-5 h-5 text-white" />
+    <!-- Settings toggle (compact) -->
+    <button
+      v-if="isCompactSettings"
+      class="settings-fab"
+      :class="{ 'settings-fab--active': showSettings }"
+      @click="showSettings = !showSettings"
+    >
+      <Icon
+        icon="carbon:settings-adjust"
+        class="settings-fab__icon"
+        :class="{ 'settings-fab__icon--open': showSettings }"
+      />
+    </button>
+
+    <!-- Settings panel -->
+    <Transition
+      enter-active-class="settings-enter-active"
+      enter-from-class="settings-enter-from"
+      enter-to-class="settings-enter-to"
+      leave-active-class="settings-leave-active"
+      leave-from-class="settings-leave-from"
+      leave-to-class="settings-leave-to"
+    >
+      <aside
+        v-if="shouldShowSettingsPanel"
+        class="settings-sidebar"
+        :class="isCompactSettings ? 'settings-sidebar--floating' : 'settings-sidebar--docked'"
+        @click.stop
+      >
+        <div class="settings-sidebar__header">
+          <Icon icon="carbon:settings-adjust" class="settings-sidebar__header-icon" />
+          <span class="settings-sidebar__title">Controls</span>
+        </div>
+
+        <!-- Brand Theme -->
+        <div class="setting-group">
+          <label class="setting-label">Brand Theme</label>
+          <div class="setting-select-wrap">
+            <select v-model="activeBrandTheme" class="setting-select">
+              <option value="">
+                Default
+              </option>
+              <option v-for="t in brandThemes.filter(Boolean)" :key="t" :value="t">
+                {{ t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') }}
+              </option>
+            </select>
+            <Icon icon="carbon:chevron-down" class="setting-select-icon" />
+          </div>
+        </div>
+
+        <!-- Code Theme -->
+        <div class="setting-group">
+          <label class="setting-label">Code Theme</label>
+          <div class="setting-select-wrap">
+            <select v-model="selectedTheme" class="setting-select" aria-label="Code block theme" @click.stop @change.stop>
+              <option v-for="t in themes" :key="t" :value="t">
+                {{ formatThemeName(t) }}
+              </option>
+            </select>
+            <Icon icon="carbon:chevron-down" class="setting-select-icon" />
+          </div>
+        </div>
+
+        <!-- Stream Profile -->
+        <div class="setting-group">
+          <label class="setting-label">Stream Profile</label>
+          <div class="setting-select-wrap">
+            <select v-model="selectedStreamPresetId" class="setting-select">
+              <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
+                {{ preset.label }}
+              </option>
+              <option :value="CUSTOM_STREAM_PRESET_ID">
+                Custom
+              </option>
+            </select>
+            <Icon icon="carbon:chevron-down" class="setting-select-icon" />
+          </div>
+          <p class="setting-hint">
+            {{ streamPresetDescription }}
+          </p>
+        </div>
+
+        <!-- Transport -->
+        <div class="setting-group">
+          <label class="setting-label">Transport</label>
+          <div class="setting-select-wrap">
+            <select v-model="streamTransportMode" class="setting-select">
+              <option value="readable-stream">
+                ReadableStream
+              </option>
+              <option value="scheduler">
+                Scheduler
+              </option>
+            </select>
+            <Icon icon="carbon:chevron-down" class="setting-select-icon" />
+          </div>
+        </div>
+
+        <!-- Slice Mode -->
+        <div class="setting-group">
+          <label class="setting-label">Slice Mode</label>
+          <div class="setting-select-wrap">
+            <select v-model="streamSliceMode" class="setting-select">
+              <option value="pure-random">
+                Pure Random
+              </option>
+              <option value="boundary-aware">
+                Boundary Aware
+              </option>
+            </select>
+            <Icon icon="carbon:chevron-down" class="setting-select-icon" />
+          </div>
+        </div>
+
+        <div class="settings-divider" />
+
+        <!-- Sliders -->
+        <div class="setting-group">
+          <label class="setting-label">Chunk Delay</label>
+          <div class="setting-slider-row">
+            <span class="setting-slider-label">Min</span>
+            <input v-model.number="streamChunkDelayMin" type="range" min="8" max="240" step="4" class="setting-slider">
+            <span class="setting-slider-value">{{ normalizedChunkDelayRange.min }}ms</span>
+          </div>
+          <div class="setting-slider-row">
+            <span class="setting-slider-label">Max</span>
+            <input v-model.number="streamChunkDelayMax" type="range" min="8" max="240" step="4" class="setting-slider">
+            <span class="setting-slider-value">{{ normalizedChunkDelayRange.max }}ms</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">Chunk Size</label>
+          <div class="setting-slider-row">
+            <span class="setting-slider-label">Min</span>
+            <input v-model.number="streamChunkSizeMin" type="range" min="1" max="24" step="1" class="setting-slider">
+            <span class="setting-slider-value">{{ normalizedChunkSizeRange.min }}</span>
+          </div>
+          <div class="setting-slider-row">
+            <span class="setting-slider-label">Max</span>
+            <input v-model.number="streamChunkSizeMax" type="range" min="1" max="24" step="1" class="setting-slider">
+            <span class="setting-slider-value">{{ normalizedChunkSizeRange.max }}</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">Burstiness</label>
+          <div class="setting-slider-row">
+            <input v-model.number="streamBurstiness" type="range" min="0" max="100" step="1" class="setting-slider">
+            <span class="setting-slider-value">{{ normalizedBurstiness }}%</span>
+          </div>
+        </div>
+
+        <p class="setting-hint">
+          Window: {{ streamChunkRangeLabel }} chars / {{ streamDelayRangeLabel }}
+        </p>
+
+        <div class="settings-divider" />
+
+        <!-- Dark Mode -->
+        <div class="setting-row-inline">
+          <label class="setting-label">Dark Mode</label>
+          <button
+            class="theme-toggle"
+            :class="{ 'theme-toggle--dark': isDark }"
+            @click.stop="toggleTheme()"
+          >
+            <div class="theme-toggle__thumb">
+              <Transition
+                enter-active-class="transition-all duration-300 ease-out"
+                leave-active-class="transition-all duration-200 ease-in"
+                enter-from-class="opacity-0 scale-0 rotate-90"
+                enter-to-class="opacity-100 scale-100 rotate-0"
+                leave-from-class="opacity-100 scale-100 rotate-0"
+                leave-to-class="opacity-0 scale-0 rotate-90"
+                mode="out-in"
+              >
+                <Icon v-if="isDark" key="moon" icon="carbon:moon" class="theme-toggle__icon theme-toggle__icon--moon" />
+                <Icon v-else key="sun" icon="carbon:sun" class="theme-toggle__icon theme-toggle__icon--sun" />
+              </Transition>
             </div>
-            <div>
-              <h1 class="text-lg font-semibold text-[hsl(var(--ms-foreground))]">
+          </button>
+        </div>
+      </aside>
+    </Transition>
+
+    <!-- Main chat area -->
+    <div class="chat-wrapper" :class="{ 'chat-wrapper--with-sidebar': !isCompactSettings }">
+      <div class="chat-container">
+        <!-- Header bar -->
+        <header class="chat-header">
+          <div class="chat-header__brand">
+            <div class="chat-header__logo">
+              <Icon icon="carbon:machine-learning-model" class="chat-header__logo-icon" />
+            </div>
+            <div class="chat-header__info">
+              <h1 class="chat-header__title">
                 markstream-vue
               </h1>
-              <p class="text-xs text-[hsl(var(--ms-muted-foreground))]">
-                Streaming markdown demo
+              <p class="chat-header__subtitle">
+                Streaming Markdown Renderer
               </p>
+              <div class="chat-header__meta">
+                <span class="chat-header__meta-pill" :class="{ 'chat-header__meta-pill--active': isStreaming }">
+                  {{ isStreaming ? (isPaused ? 'Paused' : 'Streaming') : 'Ready' }}
+                </span>
+                <span class="chat-header__meta-pill">{{ selectedTheme || 'Auto Theme' }}</span>
+              </div>
             </div>
           </div>
 
-          <div class="flex">
-            <!-- GitHub Star Button -->
+          <nav class="chat-header__nav">
             <a
               href="https://github.com/Simon-He95/markstream-vue"
               target="_blank"
               rel="noopener noreferrer"
-              class="
-              github-star-btn flex items-center gap-2 px-3 py-1.5
-              bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600
-              text-white text-sm font-medium rounded-lg
-              transition-all duration-200
-              shadow-md hover:shadow-lg
-              focus:outline-none focus:ring-2 focus:ring-blue-500/50
-            "
+              class="nav-btn nav-btn--github"
             >
-              <Icon icon="carbon:star" class="w-4 h-4" />
-              <span>Star</span>
+              <Icon icon="carbon:logo-github" class="nav-btn__icon" />
+              <span class="nav-btn__text">Star</span>
             </a>
 
-            <!-- Docs Page Link -->
             <a
-              class="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 docs-page-btn"
-              title="Open Docs"
               href="https://markstream-vue-docs.simonhe.me/"
               target="_blank"
               rel="noopener noreferrer"
+              class="nav-btn nav-btn--docs"
             >
-              <Icon icon="carbon:book" class="w-4 h-4" />
-              <span>Docs</span>
+              <Icon icon="carbon:book" class="nav-btn__icon" />
+              <span class="nav-btn__text">Docs</span>
             </a>
 
-            <button
-              class="ml-2 flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              title="Open theme gallery"
-              @click="goToThemeGallery"
-            >
-              <Icon icon="carbon:color-palette" class="w-4 h-4" />
-              <span>Themes</span>
+            <button class="nav-btn nav-btn--themes" @click="goToThemeGallery">
+              <Icon icon="carbon:color-palette" class="nav-btn__icon" />
+              <span class="nav-btn__text">Themes</span>
             </button>
 
-            <!-- Test Page Button -->
             <button
-              class="ml-2 flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-gray-200 dark:disabled:bg-gray-700 text-white disabled:text-gray-500 dark:disabled:text-gray-400 text-sm font-medium rounded-lg transition-all duration-200 shadow-md disabled:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:cursor-not-allowed"
+              class="nav-btn nav-btn--stream"
               :disabled="!isStreaming"
-              :title="isPaused ? 'Resume streaming' : 'Pause streaming'"
               @click="toggleStreamPause"
             >
-              <Icon :icon="isPaused ? 'carbon:play-filled-alt' : 'carbon:pause-filled'" class="w-4 h-4" />
-              <span>{{ isPaused ? 'Resume' : 'Pause' }}</span>
+              <Icon :icon="isPaused ? 'carbon:play-filled-alt' : 'carbon:pause-filled'" class="nav-btn__icon" />
+              <span class="nav-btn__text">{{ isPaused ? 'Resume' : 'Pause' }}</span>
             </button>
 
-            <button
-              class="ml-2 test-page-btn flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              title="Go to Test page"
-              @click="goToTest"
-            >
-              <Icon icon="carbon:rocket" class="w-4 h-4" />
-              <span>Test</span>
+            <button class="nav-btn nav-btn--test" @click="goToTest">
+              <Icon icon="carbon:rocket" class="nav-btn__icon" />
+              <span class="nav-btn__text">Test</span>
             </button>
 
-            <!-- CDN peers demo -->
-            <button
-              class="ml-2 flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              title="Go to CDN peers demo"
-              @click="goToCdnPeers"
-            >
-              <Icon icon="carbon:cloud" class="w-4 h-4" />
-              <span>CDN</span>
+            <button class="nav-btn nav-btn--cdn" @click="goToCdnPeers">
+              <Icon icon="carbon:cloud" class="nav-btn__icon" />
+              <span class="nav-btn__text">CDN</span>
             </button>
+          </nav>
+        </header>
+
+        <section class="chat-overview">
+          <div class="chat-overview__intro">
+            <span class="chat-overview__eyebrow">Live Playground</span>
+            <p class="chat-overview__summary">
+              {{ streamPresetDescription }}
+            </p>
           </div>
-        </div>
-      </div>
 
-      <!-- Messages area with scroll (use column-reverse on the scroll container) -->
-      <main ref="messagesContainer" class="mb-4 mr-[1px] flex flex-1 flex-col-reverse overflow-y-auto chatbot-messages">
-        <MarkdownRender
-          :content="content"
-          :code-block-dark-theme="selectedTheme || undefined"
-          :code-block-light-theme="selectedTheme || undefined"
-          :code-block-monaco-options="playgroundMonacoOptions"
-          :themes="themes"
-          :custom-html-tags="['thinking']"
-          :escape-html-tags="['question', 'answer']"
-          :is-dark="isDark"
-          :data-theme="activeBrandTheme || undefined"
-          custom-id="playground-demo"
-          class="p-6"
-        />
-      </main>
+          <div class="chat-overview__stats">
+            <div class="chat-overview__stat">
+              <span class="chat-overview__stat-label">Chunk</span>
+              <strong class="chat-overview__stat-value">{{ streamChunkRangeLabel }}</strong>
+            </div>
+            <div class="chat-overview__stat">
+              <span class="chat-overview__stat-label">Delay</span>
+              <strong class="chat-overview__stat-value">{{ streamDelayRangeLabel }}</strong>
+            </div>
+            <div class="chat-overview__stat">
+              <span class="chat-overview__stat-label">Transport</span>
+              <strong class="chat-overview__stat-value">{{ streamTransportMode === 'readable-stream' ? 'Reader' : 'Scheduler' }}</strong>
+            </div>
+            <div class="chat-overview__stat">
+              <span class="chat-overview__stat-label">Burst</span>
+              <strong class="chat-overview__stat-value">{{ normalizedBurstiness }}%</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- Messages area -->
+        <main ref="messagesContainer" class="chat-messages chatbot-messages">
+          <MarkdownRender
+            :content="content"
+            :code-block-dark-theme="selectedTheme || undefined"
+            :code-block-light-theme="selectedTheme || undefined"
+            :code-block-monaco-options="playgroundMonacoOptions"
+            :themes="themes"
+            :custom-html-tags="['thinking']"
+            :escape-html-tags="['question', 'answer']"
+            :is-dark="isDark"
+            :data-theme="activeBrandTheme || undefined"
+            custom-id="playground-demo"
+            class="chat-messages__content"
+          />
+        </main>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.app-container {
+/* ─── Root & Background ─── */
+.playground-root {
+  --play-accent: #0f766e;
+  --play-accent-2: #0ea5e9;
+  --play-warm: #f97316;
+  --play-ink: #0f172a;
+  --play-paper: rgba(255, 255, 255, 0.82);
+  --play-border: hsl(var(--ms-border) / 0.52);
+  font-family: 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(15, 118, 110, 0.12), transparent 46%),
+    radial-gradient(circle at 86% 88%, rgba(14, 165, 233, 0.14), transparent 48%),
+    linear-gradient(140deg, hsl(var(--ms-background)), hsl(var(--ms-muted) / 0.45));
+  color: hsl(var(--ms-foreground));
   transition: background-color 0.3s ease;
+}
+
+.playground-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   overflow: hidden;
 }
 
-.chatbot-container {
-  transition: all 0.3s ease;
-  overscroll-behavior: contain;
-  height: calc(var(--app-viewport-vh, 1vh) * 100 - 2rem);
-  max-height: calc(var(--app-viewport-vh, 1vh) * 100 - 2rem);
+.playground-bg__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.15;
 }
 
-.github-star-btn:active {
-  transform: scale(0.95);
+.playground-bg__orb--1 {
+  top: -10%;
+  left: -5%;
+  width: 600px;
+  height: 600px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
 }
 
-.chatbot-messages {
+.playground-bg__orb--2 {
+  bottom: -15%;
+  right: -8%;
+  width: 500px;
+  height: 500px;
+  background: linear-gradient(135deg, #0ea5e9, #22d3ee);
+}
+
+.playground-bg__orb--3 {
+  top: 40%;
+  left: 50%;
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  opacity: 0.08;
+}
+
+/* ─── Settings FAB (compact) ─── */
+.settings-fab {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--play-border);
+  border-radius: 14px;
+  background: var(--play-paper);
+  backdrop-filter: blur(12px) saturate(1.6);
+  box-shadow: 0 4px 24px hsl(var(--ms-foreground) / 0.06);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-fab:hover {
+  border-color: hsl(var(--ms-border));
+  box-shadow: 0 8px 32px hsl(var(--ms-foreground) / 0.1);
+  transform: translateY(-1px);
+}
+
+.settings-fab--active {
+  background: rgba(15, 118, 110, 0.12);
+  border-color: rgba(15, 118, 110, 0.3);
+}
+
+.settings-fab__icon {
+  width: 20px;
+  height: 20px;
+  color: hsl(var(--ms-muted-foreground));
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.settings-fab__icon--open {
+  transform: rotate(60deg);
+}
+
+/* ─── Settings Sidebar ─── */
+.settings-sidebar {
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 280px;
+  padding: 20px;
+  background: hsl(var(--ms-background) / 0.92);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid hsl(var(--ms-border) / 0.4);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.settings-sidebar--docked {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  border-radius: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 0;
+  box-shadow: -8px 0 40px hsl(var(--ms-foreground) / 0.05);
+}
+
+.settings-sidebar--floating {
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  max-height: calc(100vh - 84px);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px hsl(var(--ms-foreground) / 0.12);
+}
+
+.settings-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.settings-enter-from { opacity: 0; transform: translateX(16px) scale(0.96); }
+.settings-enter-to { opacity: 1; transform: translateX(0) scale(1); }
+.settings-leave-active { transition: all 0.2s ease; }
+.settings-leave-from { opacity: 1; transform: translateX(0) scale(1); }
+.settings-leave-to { opacity: 0; transform: translateX(16px) scale(0.96); }
+
+.settings-sidebar__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid hsl(var(--ms-border) / 0.4);
+}
+
+.settings-sidebar__header-icon {
+  width: 16px;
+  height: 16px;
+  color: hsl(var(--ms-muted-foreground));
+}
+
+.settings-sidebar__title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(var(--ms-muted-foreground));
+}
+
+.settings-divider {
+  height: 1px;
+  background: hsl(var(--ms-border) / 0.4);
+}
+
+/* ─── Setting Controls ─── */
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--ms-muted-foreground));
+}
+
+.setting-select-wrap {
+  position: relative;
+}
+
+.setting-select {
+  width: 100%;
+  appearance: none;
+  padding: 8px 32px 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: hsl(var(--ms-foreground));
+  background: hsl(var(--ms-muted) / 0.5);
+  border: 1px solid hsl(var(--ms-border) / 0.5);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.setting-select:hover {
+  background: hsl(var(--ms-muted) / 0.7);
+  border-color: hsl(var(--ms-border));
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: hsl(var(--ms-ring) / 0.5);
+  box-shadow: 0 0 0 3px hsl(var(--ms-ring) / 0.12);
+}
+
+.setting-select-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: hsl(var(--ms-muted-foreground));
+  pointer-events: none;
+}
+
+.setting-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: hsl(var(--ms-muted-foreground) / 0.7);
+}
+
+.setting-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-slider-label {
+  width: 28px;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: hsl(var(--ms-muted-foreground));
+}
+
+.setting-slider {
+  flex: 1;
+  cursor: pointer;
+  accent-color: hsl(var(--ms-accent, 220 70% 55%));
+}
+
+.setting-slider-value {
+  width: 48px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: hsl(var(--ms-muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+.setting-row-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ─── Theme Toggle ─── */
+.theme-toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  border-radius: 999px;
+  border: 0;
+  background: hsl(var(--ms-muted));
+  cursor: pointer;
+  transition: background 0.35s ease;
+}
+
+.theme-toggle--dark {
+  background: #3b82f6;
+}
+
+.theme-toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.theme-toggle--dark .theme-toggle__thumb {
+  left: 25px;
+}
+
+.theme-toggle__icon { width: 12px; height: 12px; }
+.theme-toggle__icon--moon { color: #3b82f6; }
+.theme-toggle__icon--sun { color: #f59e0b; }
+
+/* ─── Chat Wrapper ─── */
+.chat-wrapper {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  transition: padding-right 0.3s ease;
+}
+
+.chat-wrapper--with-sidebar {
+  padding-right: 300px;
+}
+
+/* ─── Chat Container ─── */
+.chat-container {
+  width: 100%;
+  max-width: 960px;
+  min-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid var(--play-border);
+  background:
+    linear-gradient(180deg, hsl(var(--ms-background) / 0.88), hsl(var(--ms-background) / 0.78));
+  backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow:
+    0 0 0 1px hsl(var(--ms-border) / 0.1),
+    0 28px 84px hsl(var(--ms-foreground) / 0.1),
+    0 8px 24px hsl(var(--ms-foreground) / 0.04);
+}
+
+.chat-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(15, 23, 42, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.018) 1px, transparent 1px);
+  background-size: 30px 30px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent 78%);
+}
+
+/* ─── Chat Header ─── */
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid hsl(var(--ms-border) / 0.4);
+  background: linear-gradient(180deg, hsl(var(--ms-muted) / 0.46), hsl(var(--ms-muted) / 0.24));
+  flex-wrap: wrap;
+}
+
+.chat-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-header__logo {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(140deg, var(--play-accent), var(--play-accent-2), var(--play-warm));
+  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.35);
+}
+
+.chat-header__logo-icon {
+  width: 22px;
+  height: 22px;
+  color: #fff;
+}
+
+.chat-header__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header__meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-header__meta-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: hsl(var(--ms-muted-foreground));
+  background: hsl(var(--ms-muted) / 0.56);
+  border: 1px solid hsl(var(--ms-border) / 0.45);
+}
+
+.chat-header__meta-pill--active {
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.28);
+  background: rgba(15, 118, 110, 0.14);
+}
+
+.chat-header__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: hsl(var(--ms-foreground));
+  letter-spacing: -0.01em;
+}
+
+.chat-header__subtitle {
+  margin: 0;
+  font-size: 0.75rem;
+  color: hsl(var(--ms-muted-foreground));
+}
+
+/* ─── Nav Buttons ─── */
+.chat-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ─── Chat Overview ─── */
+.chat-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid hsl(var(--ms-border) / 0.34);
+  background:
+    linear-gradient(180deg, hsl(var(--ms-background) / 0.46), hsl(var(--ms-background) / 0.18));
+}
+
+.chat-overview__intro {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.chat-overview__eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  color: #0f766e;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chat-overview__summary {
+  margin: 0;
+  max-width: 52ch;
+  color: hsl(var(--ms-muted-foreground));
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.chat-overview__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.chat-overview__stat {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid hsl(var(--ms-border) / 0.42);
+  background: hsl(var(--ms-muted) / 0.32);
+}
+
+.chat-overview__stat-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--ms-muted-foreground));
+}
+
+.chat-overview__stat-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: hsl(var(--ms-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #f8fafc;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+.nav-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.nav-btn:active {
+  transform: scale(0.96);
+}
+
+.nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.nav-btn__icon { width: 15px; height: 15px; }
+.nav-btn__text { line-height: 1; }
+
+.nav-btn--github { background: #24292f; }
+.nav-btn--docs { background: #0f766e; }
+.nav-btn--themes { background: #0e7490; }
+.nav-btn--stream { background: #c2410c; }
+.nav-btn--test { background: #0369a1; }
+.nav-btn--cdn { background: #475569; }
+
+/* ─── Chat Messages ─── */
+.chat-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow-y: visible;
   scroll-behavior: smooth;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
 }
-.chatbot-messages > .markdown-renderer {
+
+.chat-messages > .markdown-renderer {
   min-height: 100%;
   box-sizing: border-box;
 }
 
-/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
-.chatbot-messages.disable-min-height > .markdown-renderer {
+.chat-messages.disable-min-height > .markdown-renderer {
   min-height: unset !important;
 }
 
-/* Scrollbar: use native OS behavior (macOS overlay scrollbars) */
-
-.settings-toggle {
-  backdrop-filter: blur(8px);
+.chat-messages__content {
+  padding: 28px 32px;
+  font-family: 'Avenir Next', 'SF Pro Text', sans-serif;
 }
 
-.settings-toggle:active {
-  transform: scale(0.95);
-}
-
-/* 主题选择器自定义样式 */
-.theme-selector select:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.theme-selector select option {
-  padding: 8px 12px;
-  background-color: hsl(var(--ms-background));
-  color: hsl(var(--ms-foreground));
-}
-
-/* 设置面板动画 */
-.settings-panel {
-  transform-origin: top right;
-}
-
-/* 代码块加载时的流光闪烁效果 */
+/* ─── Code block rendering glow ─── */
 :deep(.code-block-container.is-rendering) {
   position: relative;
   animation: renderingGlow 2s ease-in-out infinite;
 }
 
 @keyframes renderingGlow {
-  0% {
-    box-shadow:
-      0 0 10px rgba(59, 130, 246, 0.4),
-      0 0 20px rgba(59, 130, 246, 0.2);
-  }
-  25% {
-    box-shadow:
-      0 0 15px rgba(139, 92, 246, 0.5),
-      0 0 30px rgba(139, 92, 246, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 20px rgba(236, 72, 153, 0.5),
-      0 0 40px rgba(236, 72, 153, 0.3);
-  }
-  75% {
-    box-shadow:
-      0 0 15px rgba(16, 185, 129, 0.5),
-      0 0 30px rgba(16, 185, 129, 0.3);
-  }
-  100% {
-    box-shadow:
-      0 0 10px rgba(59, 130, 246, 0.4),
-      0 0 20px rgba(59, 130, 246, 0.2);
-  }
+  0% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2); }
+  25% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.5), 0 0 30px rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(236, 72, 153, 0.5), 0 0 40px rgba(236, 72, 153, 0.3); }
+  75% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.5), 0 0 30px rgba(16, 185, 129, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2); }
 }
 
-/* Mermaid 块加载时的流光闪烁效果 */
 :deep(.is-rendering) {
   position: relative;
   animation: renderingGlow 2s ease-in-out infinite;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .chat-wrapper { padding: 10px; }
+  .chat-wrapper--with-sidebar { padding-right: 10px; }
+  .chat-container { border-radius: 18px; min-height: calc(100vh - 20px); }
+  .chat-header__nav { gap: 4px; }
+  .chat-overview { grid-template-columns: 1fr; padding: 14px 16px; }
+  .chat-overview__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-btn { padding: 5px 8px; font-size: 0.72rem; border-radius: 8px; }
+  .nav-btn__text { display: none; }
+  .nav-btn__icon { width: 16px; height: 16px; }
+  .chat-messages__content { padding: 20px 16px; }
 }
 </style>

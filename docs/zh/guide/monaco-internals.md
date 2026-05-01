@@ -30,10 +30,12 @@ export default defineConfig({ plugins: [monacoEditorPlugin()] })
 ## 运行时行为与性能
 - 本库设计为当 `CodeBlockNode` 挂载时懒加载 Monaco，从而减少首次渲染时的包体积。仅在需要时才初始化 Monaco 编辑器。
 - 在大量 CodeBlock 的页面中，启用 `viewportPriority` 或在父组件中延迟加载可以显著降低内存占用并提升首屏速度。
+- 如果宿主应用希望更早预热 Monaco，请调用 `markstream-vue` 暴露的 `preloadCodeBlockRuntime()`，不要直接 import `stream-monaco` 做预热。这样 Monaco worker 预热和 markstream-vue 内部的代码块 runtime-ready 状态会保持一致。
 
 ## 打包到库的注意事项
 - 当把本库打包进其他项目时，请在目标项目中正确配置 worker 路径或使用插件的选项来重新定位。
-- 可在页面需要时调用 `getUseMonaco()` 预加载 Monaco，以改善首次打开大型文档时的响应。
+- 可在页面需要时调用 `preloadCodeBlockRuntime()` 预加载代码块运行时，以改善首次打开大型文档时的响应，并避免已预热后的代码块重新挂载时闪回 `<pre>` fallback。
+- 已有代码如果使用 `getUseMonaco()`，可以保持不变；它也会设置相同的 runtime-ready 状态。
 
 ## 常见故障排查
 - 如果看到 `Failed to load Monaco worker`，先在浏览器网络面板（Network）中检查 worker 文件的请求与响应；资源 404 或路径不正确通常就是问题所在。

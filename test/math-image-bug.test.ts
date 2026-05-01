@@ -214,4 +214,223 @@ describe('math followed by image bug', () => {
     expect((imageNode as { alt: string }).alt).toBe('img')
     expect((imageNode as { title: string | null }).title).toBe('title')
   })
+
+  it('should parse image whose alt text contains inline math formulas', () => {
+    const md = getMarkdown()
+    const content = '![图6：Brain-Score大脑对齐性能（RSA）。我们测试了TopoLM和非拓扑控制在Brain-Score语言上的表现，使用表示相似性分析（RSA）来估计对齐。TopoLM在Pereira2018上优于控制，但在Blank2014和Fedorenko2016上表现较差（对每个基准分别进行的\\(t\\)-检验：\\(p<0.05\\)）。对于每个基准，我们从10个交叉验证循环中抽样，以计算自助法95%置信区间（黑条）。当结果在3个基准上取平均时（最后一面板"Brain-Score"），我们发现TopoLM与其控制之间存在显著差异（\\(t\\)-检验：\\(p>0.05\\)）。然而，这一结果需要谨慎解读，因为它主要受Fedorenko2016的结果影响，该结果仅显示非常大的绝对值，因为用于归一化的基础数据非常嘈杂，即噪声上限非常低。](https://www.baidu.com/img/PCfb_5bf082d29588c07f842ccde3f97243ea.png)'
+    const result = parseMarkdownToStructure(content, md)
+
+    // Should have 1 paragraph node
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // Should contain a single image node (not broken into multiple tokens)
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://www.baidu.com/img/PCfb_5bf082d29588c07f842ccde3f97243ea.png')
+
+    // Should NOT have math_inline nodes (math is inside the image alt text, not standalone)
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(0)
+
+    // Should NOT have link nodes
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
+
+  it('should parse image with dollar-sign math in alt text as a single image', () => {
+    const md = getMarkdown()
+    const content = '![graph shows $E=mc^2$ result](https://example.com/img.png)'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://example.com/img.png')
+
+    // Dollar-sign math inside alt text should NOT produce standalone math_inline tokens
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(0)
+
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
+
+  it('should parse image with double-dollar math in alt text as a single image', () => {
+    const md = getMarkdown()
+    const content = '![formula $$x^2 + y^2$$ here](https://example.com/img.png)'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://example.com/img.png')
+
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(0)
+
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
+
+  it('should still parse standalone \\(math\\) outside images correctly', () => {
+    const md = getMarkdown()
+    const content = 'The result is \\(x^2 + y^2 = z^2\\) as expected.'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(1)
+    expect((mathNodes[0] as { content: string }).content).toBe('x^2 + y^2 = z^2')
+  })
+
+  it('should parse math before and after an image with math in alt text', () => {
+    const md = getMarkdown()
+    const content = '\\(a\\) ![alt with \\(b\\) inside](https://example.com/img.png) \\(c\\)'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // The standalone \(a\) and \(c\) should still be math_inline
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(2)
+    expect((mathNodes[0] as { content: string }).content).toBe('a')
+    expect((mathNodes[1] as { content: string }).content).toBe('c')
+
+    // The image should be intact
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://example.com/img.png')
+
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
+
+  it('should parse multiple images each with math in alt text on the same line', () => {
+    const md = getMarkdown()
+    const content = '![fig1 \\(x\\)](url1) ![fig2 \\(y\\)](url2)'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // Both images should be intact
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(2)
+    expect((imageNodes[0] as { src: string }).src).toBe('url1')
+    expect((imageNodes[1] as { src: string }).src).toBe('url2')
+
+    // No math_inline tokens should leak out
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(0)
+
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
+
+  it('should handle $-math mixed with image containing $-math in alt text', () => {
+    const md = getMarkdown()
+    const content = '$a$ ![alt with $b$ inside](https://example.com/img.png) $c$'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // The standalone $a$ and $c$ should still be math_inline
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(2)
+    expect((mathNodes[0] as { content: string }).content).toBe('a')
+    expect((mathNodes[1] as { content: string }).content).toBe('c')
+
+    // The image should be intact
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://example.com/img.png')
+
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
+
+  it('should handle incomplete image syntax followed by math-like content', () => {
+    const md = getMarkdown()
+    // Incomplete image: no ](url) closing
+    const content = '![alt text \\(math\\) here'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // The key verification: no link nodes should be produced
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+
+    // The parser may produce a loading image node from partial syntax - that's existing behavior
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    if (imageNodes.length > 0) {
+      // If image is produced, it should be loading (incomplete)
+      expect((imageNodes[0] as { loading: boolean }).loading).toBe(true)
+    }
+  })
+
+  it('should still parse math when ! is not followed by [ (not image syntax)', () => {
+    const md = getMarkdown()
+    const content = 'Important! The result is \\(x\\) here.'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // ! without [ is not image syntax, so math should still be parsed
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(1)
+    expect((mathNodes[0] as { content: string }).content).toBe('x')
+
+    // No image nodes
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(0)
+  })
+
+  it('should handle image with multiple different math delimiter types in alt', () => {
+    const md = getMarkdown()
+    const content = '![混合: \\(a\\) and $b$ and $$c$$](https://example.com/img.png)'
+    const result = parseMarkdownToStructure(content, md)
+
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // The image should be intact regardless of which math delimiters are used
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://example.com/img.png')
+
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(0)
+
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
 })

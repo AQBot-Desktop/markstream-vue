@@ -1,5 +1,6 @@
 <script>
 import MarkdownRender from 'markstream-vue2'
+import { resolveMarkdownTextareaPaste } from '../../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode } from '../../../playground-shared/testPageState'
 
@@ -135,6 +136,22 @@ export default {
       this.stopStreamRender()
       this.input = ''
       this.isPreviewShareCopied = false
+    },
+    handleEditorPaste(event) {
+      const textarea = event.currentTarget
+      if (!(textarea instanceof HTMLTextAreaElement))
+        return
+
+      const pasted = event.clipboardData && event.clipboardData.getData('text/plain')
+      const next = resolveMarkdownTextareaPaste(textarea, pasted || '')
+      if (!next)
+        return
+
+      event.preventDefault()
+      textarea.value = next.nextValue
+      textarea.selectionStart = next.selectionStart
+      textarea.selectionEnd = next.selectionEnd
+      this.input = next.nextValue
     },
     goHome() {
       this.stopStreamRender()
@@ -356,6 +373,7 @@ export default {
               class="editor-textarea"
               spellcheck="false"
               placeholder="在这里粘贴 markdown..."
+              @paste="handleEditorPaste"
             />
 
             <footer class="workspace-card__foot">

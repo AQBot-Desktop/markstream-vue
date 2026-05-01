@@ -55,7 +55,7 @@ The single-argument form `setCustomComponents({ ... })` is still supported, but 
 |-----|------------------|-------|
 | `image` | `ImageNode` | Great first override for lightboxes, captions, or lazy-loading wrappers |
 | `link` | `LinkNode` | Useful for analytics, router links, or custom tooltip behavior |
-| `code_block` | Regular fenced code blocks | Does not replace `mermaid`, `d2`, or `infographic` blocks |
+| `code_block` | Regular fenced code blocks | Used as the generic fallback after exact language keys and the built-in `mermaid` / `d2` / `infographic` routes |
 | `mermaid` | Mermaid fenced blocks | Preferred over `code_block` when only Mermaid needs a custom renderer |
 | `d2` | D2 and `d2lang` fenced blocks | Same routing idea as Mermaid |
 | `infographic` | Infographic fenced blocks | Use when only infographic output changes |
@@ -109,6 +109,25 @@ setCustomComponents('docs', {
 ```
 
 This only changes regular fenced code blocks. Mermaid, D2, and infographic blocks still route to their specialized renderers unless you override `mermaid`, `d2`, or `infographic`.
+
+### Example: target one fenced language directly
+
+```ts twoslash
+import type { Component } from 'vue'
+import { setCustomComponents } from 'markstream-vue'
+
+declare const EChartsBlockNode: Component
+
+setCustomComponents('docs', {
+  echarts: EChartsBlockNode,
+})
+```
+
+This only catches fences whose language is `echarts`. The routing order for code blocks is:
+
+- exact language key such as `echarts`
+- built-in specialized routes such as `mermaid`, `d2`, and `infographic`
+- generic `code_block`
 
 ### Example: override Mermaid only
 

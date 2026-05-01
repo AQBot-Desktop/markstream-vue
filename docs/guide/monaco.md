@@ -13,6 +13,7 @@ Use `CodeBlockNode` (default) to render Monaco-powered code blocks. For read-onl
 Tips:
 - Defer Monaco initialization for offscreen code blocks
 - Use `codeBlockStream: false` to avoid partial updates if desired
+- Preload via `preloadCodeBlockRuntime()` during app idle or route setup when code blocks are likely
 - No additional CSS import is required
 
 ![Monaco demo](/screenshots/codeblock-demo.svg)
@@ -67,15 +68,17 @@ export default defineConfig({
 
 ### Preloading Monaco
 
-To avoid a first-render flash when the first code block mounts, preload the Monaco integration during app initialization or on first route mount:
+To avoid a cold-start fallback flash when the first code block mounts, preload the code block runtime during app initialization, app idle time, or on first route mount:
 
 ```ts
-import { getUseMonaco } from 'markstream-vue'
+import { preloadCodeBlockRuntime } from 'markstream-vue'
 
-getUseMonaco()
+void preloadCodeBlockRuntime()
 ```
 
-`getUseMonaco` attempts to dynamically import `stream-monaco` and call its helper to register workers; if not available it fails gracefully and the code block falls back to a lightweight rendering.
+`preloadCodeBlockRuntime()` dynamically imports `stream-monaco`, registers Monaco workers through markstream-vue's runtime path, and marks the code block runtime as ready so later `CodeBlockNode` remounts can skip the `<pre>` loading fallback.
+
+Existing code that calls `getUseMonaco()` can stay as-is; it now has the same runtime-ready side effect and still returns the loaded `stream-monaco` module or `null`.
 
 ### Webpack & MonacoWebpackPlugin
 

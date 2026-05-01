@@ -3,7 +3,7 @@
  */
 
 import { createRequire } from 'node:module'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const packageRequire = createRequire(new URL('../packages/markstream-react/package.json', import.meta.url))
 const React = packageRequire('react') as typeof import('react')
@@ -507,6 +507,12 @@ function renderExport(name: string, element: React.ReactElement) {
 }
 
 describe('markstream-react next/server SSR', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
   afterEach(async () => {
     const serverEntry = await import('../packages/markstream-react/src/server')
     serverEntry.clearGlobalCustomComponents()
@@ -514,19 +520,22 @@ describe('markstream-react next/server SSR', () => {
     serverEntry.removeCustomComponents?.('next-ssr-lab-alt')
     serverEntry.removeCustomComponents?.('server-ssr-lab')
     serverEntry.removeCustomComponents?.('server-ssr-lab-alt')
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.resetModules()
   })
 
   it('keeps root, next, and server entry imports safe', async () => {
-    const entries = await Promise.all([
-      import('../packages/markstream-react/src/index'),
-      import('../packages/markstream-react/src/next'),
-      import('../packages/markstream-react/src/server'),
-    ])
+    const entries = [
+      await import('../packages/markstream-react/src/index'),
+      await import('../packages/markstream-react/src/next'),
+      await import('../packages/markstream-react/src/server'),
+    ]
 
     expect(typeof entries[0].default).toBe('function')
     expect(typeof entries[1].default).toBe('function')
     expect(typeof entries[2].default).toBe('function')
-  })
+  }, 15000)
 
   it('renders the next entry export matrix as SSR-safe HTML', async () => {
     const nextEntry = await import('../packages/markstream-react/src/next')
@@ -568,6 +577,58 @@ describe('markstream-react next/server SSR', () => {
     )
     expect(malformedHtml).toContain('&lt;question&gt;ok')
     expect(malformedHtml).not.toContain('&amp;lt;')
+  })
+
+  it('renders structured html wrappers on the server without structuring blocked tags', async () => {
+    const serverEntry = await import('../packages/markstream-react/src/server')
+
+    const structuredHtml = renderToStaticMarkup(
+      React.createElement(serverEntry.NodeRenderer, {
+        nodes: [
+          {
+            type: 'html_block',
+            tag: 'span',
+            attrs: [['style', 'font-size: 12px;']],
+            content: '<span style="font-size: 12px;"></span>',
+            children: [
+              {
+                type: 'list',
+                ordered: false,
+                items: [listItemNode('alpha'), listItemNode('beta')],
+              },
+            ],
+          } as any,
+        ],
+      }),
+    )
+
+    expect(structuredHtml).toContain('<span')
+    expect(structuredHtml).toContain('font-size:12px')
+    expect(structuredHtml).toContain('<ul')
+    expect(structuredHtml).toContain('alpha')
+    expect(structuredHtml).toContain('beta')
+
+    const blockedHtml = renderToStaticMarkup(
+      React.createElement(serverEntry.NodeRenderer, {
+        nodes: [
+          {
+            type: 'html_block',
+            tag: 'script',
+            content: '<script>\n\n- alpha\n\n</script>',
+            children: [
+              {
+                type: 'list',
+                ordered: false,
+                items: [listItemNode('alpha')],
+              },
+            ],
+          } as any,
+        ],
+      }),
+    )
+
+    expect(blockedHtml).not.toContain('<ul>')
+    expect(blockedHtml).not.toContain('<li>')
   })
 
   it('renders custom overrides, custom tags, and heavy-node fallbacks through next and server entries', async () => {

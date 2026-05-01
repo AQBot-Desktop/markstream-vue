@@ -171,6 +171,14 @@ export const BLOCKED_HTML_TAG_NAMES = [
   'script',
 ] as const
 
+export const NON_STRUCTURING_HTML_TAG_NAMES = [
+  'pre',
+  'script',
+  'style',
+  'textarea',
+  'title',
+] as const
+
 export const VOID_HTML_TAGS = new Set<string>(VOID_HTML_TAG_NAMES)
 export const STANDARD_BLOCK_HTML_TAGS = new Set<string>(BLOCK_HTML_TAG_NAMES)
 export const STANDARD_HTML_TAGS = new Set<string>([
@@ -186,6 +194,7 @@ export const EXTENDED_STANDARD_HTML_TAGS = new Set<string>([
 export const DANGEROUS_HTML_ATTRS = new Set<string>(DANGEROUS_HTML_ATTR_NAMES)
 export const URL_HTML_ATTRS = new Set<string>(URL_HTML_ATTR_NAMES)
 export const BLOCKED_HTML_TAGS = new Set<string>(BLOCKED_HTML_TAG_NAMES)
+export const NON_STRUCTURING_HTML_TAGS = new Set<string>(NON_STRUCTURING_HTML_TAG_NAMES)
 
 export function stripHtmlControlAndWhitespace(value: string) {
   let out = ''

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtmlContent } from 'stream-markdown-parser'
 import { computed, defineComponent } from 'vue-demi'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
@@ -49,7 +50,7 @@ const renderMode = computed(() => {
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content }
+    return { mode: 'html', content: sanitizeHtmlContent(content) }
 
   return { mode: 'dynamic', content }
 })

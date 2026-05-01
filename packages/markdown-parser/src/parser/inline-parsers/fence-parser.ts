@@ -28,6 +28,12 @@ function splitUnifiedDiff(content: string, closed: boolean) {
   const pendingUpdated: string[] = []
   const lines = content.split(NEWLINE_RE)
   const stableLineCount = Math.max(0, lines.length - 1)
+  const hasUnifiedDiffHeaders = lines.some(line =>
+    line.startsWith('diff ')
+    || line.startsWith('--- ')
+    || line.startsWith('+++ ')
+    || line.startsWith('@@ '),
+  )
 
   const processLine = (rawLine: string) => {
     const line = rawLine
@@ -35,17 +41,19 @@ function splitUnifiedDiff(content: string, closed: boolean) {
     if (DIFF_HEADER_PREFIXES.some(p => line.startsWith(p)))
       return
 
-    if (line.length >= 2 && line[0] === '-' && line[1] === ' ') {
-      pendingOrig.push(` ${line.slice(1)}`)
+    if (line.startsWith('-')) {
+      const body = line.slice(1)
+      pendingOrig.push(!hasUnifiedDiffHeaders && body.startsWith(' ') ? ` ${body}` : body)
     }
-    else if (line.length >= 2 && line[0] === '+' && line[1] === ' ') {
-      pendingUpdated.push(` ${line.slice(1)}`)
+    else if (line.startsWith('+')) {
+      const body = line.slice(1)
+      pendingUpdated.push(!hasUnifiedDiffHeaders && body.startsWith(' ') ? ` ${body}` : body)
     }
     else {
       flushPendingDiffHunk(orig, updated, pendingOrig, pendingUpdated)
-      // fallback: treat as context (no prefix)
-      orig.push(line)
-      updated.push(line)
+      const contextLine = hasUnifiedDiffHeaders && line.startsWith(' ') ? line.slice(1) : line
+      orig.push(contextLine)
+      updated.push(contextLine)
     }
   }
 

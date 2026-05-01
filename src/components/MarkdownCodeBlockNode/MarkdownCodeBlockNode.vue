@@ -42,6 +42,8 @@ const props = withDefaults(
     showFontSizeButtons?: boolean
     /** Toggle singleton tooltips for header action buttons */
     showTooltips?: boolean
+    autoScrollOnUpdate?: boolean
+    autoScrollInitial?: boolean
     estimatedHeightPx?: number
     estimatedContentHeightPx?: number
   }>(),
@@ -63,6 +65,8 @@ const props = withDefaults(
     showPreviewButton: true,
     showCollapseButton: true,
     showFontSizeButtons: true,
+    autoScrollOnUpdate: true,
+    autoScrollInitial: true,
   },
 )
 
@@ -105,8 +109,9 @@ if (typeof window !== 'undefined') {
 }
 
 // Auto-scroll state management
-const autoScrollEnabled = ref(true) // Start with auto-scroll enabled
+const autoScrollEnabled = ref(props.autoScrollInitial !== false)
 const lastScrollTop = ref(0) // Track last scroll position to detect scroll direction
+const shouldAutoScrollOnUpdate = computed(() => props.autoScrollOnUpdate !== false)
 
 // Font size control
 const codeFontMin = 10
@@ -174,13 +179,6 @@ const contentStyle = computed(() => {
     ...(shouldReserveEstimatedContentHeight.value
       ? { minHeight: `${estimatedVisibleContentHeight.value}px` }
       : {}),
-  }
-})
-const loadingPlaceholderStyle = computed(() => {
-  if (estimatedVisibleContentHeight.value == null)
-    return undefined
-  return {
-    minHeight: `${estimatedVisibleContentHeight.value}px`,
   }
 })
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
@@ -406,6 +404,10 @@ watch(tooltipsEnabled, (enabled) => {
     hideTooltip()
 })
 
+watch(() => props.autoScrollInitial, (enabled) => {
+  autoScrollEnabled.value = enabled !== false
+})
+
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   const normalizedLang = normalizeLanguageIdentifier(lang)
   if (normalizedLang !== codeLanguage.value)
@@ -449,7 +451,7 @@ watch(
 
 // Auto-scroll to bottom when content changes (if not expanded and auto-scroll is enabled)
 watch(() => props.node.code, async () => {
-  if (isExpanded.value || !autoScrollEnabled.value)
+  if (isExpanded.value || !shouldAutoScrollOnUpdate.value || !autoScrollEnabled.value)
     return
 
   await nextTick()
@@ -473,7 +475,7 @@ function isAtBottom(element: HTMLElement, threshold = 50): boolean {
 // Handle scroll event to detect user interaction
 function handleScroll() {
   const content = codeBlockContent.value
-  if (!content || isExpanded.value)
+  if (!content || isExpanded.value || !shouldAutoScrollOnUpdate.value)
     return
 
   const currentScrollTop = content.scrollTop
@@ -517,36 +519,6 @@ function resolveTooltipTarget(e: Event) {
   return btn
 }
 
-type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
-function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
-  if (!tooltipsEnabled.value)
-    return
-  const target = resolveTooltipTarget(e)
-  if (!target)
-    return
-  const ev = e as MouseEvent
-  const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(target, text, place, false, origin, props.isDark)
-}
-
-function onBtnLeave() {
-  if (!tooltipsEnabled.value)
-    return
-  hideTooltip()
-}
-
-function onCopyHover(e: Event) {
-  if (!tooltipsEnabled.value)
-    return
-  const target = resolveTooltipTarget(e)
-  if (!target)
-    return
-  const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
-  const ev = e as MouseEvent
-  const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(target, txt, 'top', false, origin, props.isDark)
-}
-
 // Expand/collapse functionality
 function toggleExpand(e?: Event) {
   isExpanded.value = !isExpanded.value
@@ -571,13 +543,14 @@ function toggleExpand(e?: Event) {
   else {
     content.style.maxHeight = ''
     content.style.overflow = 'auto'
-    // When collapsing, re-enable auto-scroll and scroll to bottom
-    autoScrollEnabled.value = true
-    nextTick(() => {
-      if (content.scrollHeight > content.clientHeight) {
-        content.scrollTop = content.scrollHeight
-      }
-    })
+    if (shouldAutoScrollOnUpdate.value) {
+      autoScrollEnabled.value = true
+      nextTick(() => {
+        if (content.scrollHeight > content.clientHeight) {
+          content.scrollTop = content.scrollHeight
+        }
+      })
+    }
   }
 }
 
@@ -700,6 +673,7 @@ function previewCode() {
 <style scoped>
 /* ── Code content ── */
 .code-block-content {
+  display: grid;
   max-height: min(70vh, var(--ms-size-code-max-height));
   overflow: auto;
   transition: max-height var(--ms-duration-slow) var(--ms-ease-standard);
@@ -719,6 +693,12 @@ function previewCode() {
   line-height: var(--vscode-editor-line-height, 1.5);
 }
 
+.code-block-render,
+.code-fallback-plain {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
 .code-block-render {
   min-height: 1px;
 }
@@ -730,15 +710,19 @@ function previewCode() {
   line-height: inherit;
 }
 
-:deep(.code-block-content .shiki-fallback) {
-  padding: 1rem;
+:deep(.code-block-content pre) {
+  box-sizing: border-box;
   margin: 0;
-  background: transparent;
-  color: inherit;
-  white-space: pre;
+  padding: 1rem;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+
+:deep(.code-block-content .shiki-fallback) {
+  background: transparent;
+  color: inherit;
+  white-space: pre;
 }
 
 .code-fallback-plain {
@@ -749,10 +733,6 @@ function previewCode() {
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;
-}
-
-:deep(.code-block-content pre) {
-  padding: 1rem;
 }
 
 /* ── Loading placeholder ── */

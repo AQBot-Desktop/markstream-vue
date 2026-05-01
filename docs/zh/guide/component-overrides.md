@@ -55,7 +55,7 @@ const markdown = '![demo](https://example.com/demo.png)'
 |-----|-----------|------|
 | `image` | `ImageNode` | 最适合拿来做 lightbox、caption、懒加载封装 |
 | `link` | `LinkNode` | 适合埋点、路由跳转、自定义 tooltip |
-| `code_block` | 普通 fenced code block | 不会替换 `mermaid`、`d2`、`infographic` |
+| `code_block` | 普通 fenced code block | 作为通用兜底使用，优先级在精确语言 key 和内置 `mermaid` / `d2` / `infographic` 路由之后 |
 | `mermaid` | Mermaid fenced block | 只改 Mermaid 时优先用它，而不是改全部代码块 |
 | `d2` | D2 / `d2lang` fenced block | 与 Mermaid 同理 |
 | `infographic` | Infographic fenced block | 只影响 infographic 渲染 |
@@ -109,6 +109,25 @@ setCustomComponents('docs', {
 ```
 
 这只会影响普通代码块。Mermaid、D2 和 infographic 仍然会走各自的专用渲染器；如果你要覆盖它们，请分别使用 `mermaid`、`d2`、`infographic`。
+
+### 示例：只接管一种 fenced language
+
+```ts twoslash
+import type { Component } from 'vue'
+import { setCustomComponents } from 'markstream-vue'
+
+declare const EChartsBlockNode: Component
+
+setCustomComponents('docs', {
+  echarts: EChartsBlockNode,
+})
+```
+
+这只会命中 language 为 `echarts` 的 fence。代码块的路由优先级是：
+
+- 精确语言 key，比如 `echarts`
+- 内置专用路由，比如 `mermaid`、`d2`、`infographic`
+- 通用 `code_block`
 
 ### 示例：只覆盖 Mermaid
 

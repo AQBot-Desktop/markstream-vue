@@ -3,6 +3,7 @@ import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-mark
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
+import { h as createVNode } from 'vue'
 import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -34,6 +35,7 @@ import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
+import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import { isLegacyVue26Vm } from '../../utils/vue26'
@@ -1511,32 +1513,140 @@ async function CodeBlockNodeAsync() {
   }
 }
 
-async function MermaidBlockNodeAsync() {
-  try {
-    const mod = await import('../../components/MermaidBlockNode')
-    return (mod as any).default ?? mod
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue2] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
-      e,
-    )
-    return PreCodeNode
-  }
+const MermaidBlockNodeLoading = {
+  name: 'MermaidBlockNodeLoading',
+  props: {
+    estimatedPreviewHeightPx: Number,
+    isDark: Boolean,
+    showHeader: { type: Boolean, default: true },
+  },
+  render(this: any, renderH?: any) {
+    const h = typeof renderH === 'function' ? renderH : createVNode
+    const attrProps = typeof renderH === 'function'
+      ? { attrs: { 'data-markstream-mermaid': '1', 'data-markstream-mode': 'pending' } }
+      : { 'data-markstream-mermaid': '1', 'data-markstream-mode': 'pending' }
+    const height = `${parsePositiveNumber(this.estimatedPreviewHeightPx) ?? 360}px`
+    return h('div', {
+      ...attrProps,
+      class: [
+        'my-4 rounded-lg border overflow-hidden shadow-sm',
+        this.isDark ? 'border-gray-700/30' : 'border-gray-200',
+      ],
+    }, [
+      this.showHeader === false
+        ? null
+        : h('div', {
+            class: [
+              'mermaid-block-header flex justify-between items-center px-4 py-2.5 border-b',
+              this.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200',
+            ],
+          }, [
+            h('div', { class: 'flex items-center gap-x-2 overflow-hidden' }, [
+              h('span', { class: this.isDark ? 'text-sm font-medium font-mono truncate text-gray-400' : 'text-sm font-medium font-mono truncate text-gray-600' }, 'Mermaid'),
+            ]),
+          ]),
+      h('div', {
+        class: [
+          'mermaid-preview-area min-h-[360px] relative overflow-hidden block',
+          this.isDark ? 'bg-gray-900' : 'bg-gray-50',
+        ],
+        style: { height },
+      }),
+    ])
+  },
 }
 
-async function InfographicBlockNodeAsync() {
-  try {
-    const mod = await import('../../components/InfographicBlockNode')
-    return (mod as any).default ?? mod
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue2] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering.',
-      e,
-    )
-    return PreCodeNode
-  }
+const mermaidBlockNodeComponent = ref<any | null>(null)
+let mermaidBlockNodeImport: Promise<void> | null = null
+
+function loadMermaidBlockNode() {
+  if (mermaidBlockNodeComponent.value || mermaidBlockNodeImport)
+    return
+  mermaidBlockNodeImport = import('../../components/MermaidBlockNode')
+    .then(mod => (mod as any).default ?? mod)
+    .then((component) => {
+      mermaidBlockNodeComponent.value = component
+    })
+    .catch((e) => {
+      console.warn(
+        '[markstream-vue2] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+        e,
+      )
+      mermaidBlockNodeComponent.value = PreCodeNode
+    })
+}
+
+function resolveMermaidBlockNodeComponent() {
+  loadMermaidBlockNode()
+  return mermaidBlockNodeComponent.value || MermaidBlockNodeLoading
+}
+
+const InfographicBlockNodeLoading = {
+  name: 'InfographicBlockNodeLoading',
+  props: {
+    estimatedPreviewHeightPx: Number,
+    isDark: Boolean,
+    showHeader: { type: Boolean, default: true },
+  },
+  render(this: any, renderH?: any) {
+    const h = typeof renderH === 'function' ? renderH : createVNode
+    const attrProps = typeof renderH === 'function'
+      ? { attrs: { 'data-markstream-infographic': '1', 'data-markstream-mode': 'pending' } }
+      : { 'data-markstream-infographic': '1', 'data-markstream-mode': 'pending' }
+    const height = `${parsePositiveNumber(this.estimatedPreviewHeightPx) ?? 360}px`
+    return h('div', {
+      ...attrProps,
+      class: [
+        'my-4 rounded-lg border overflow-hidden shadow-sm',
+        this.isDark ? 'border-gray-700/30' : 'border-gray-200',
+      ],
+    }, [
+      this.showHeader === false
+        ? null
+        : h('div', {
+            class: [
+              'infographic-block-header flex justify-between items-center px-4 py-2.5 border-b',
+              this.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200',
+            ],
+          }, [
+            h('div', { class: 'flex items-center gap-x-2 overflow-hidden' }, [
+              h('span', { class: this.isDark ? 'text-sm font-medium font-mono truncate text-gray-400' : 'text-sm font-medium font-mono truncate text-gray-600' }, 'Infographic'),
+            ]),
+          ]),
+      h('div', {
+        class: [
+          'infographic-preview min-h-[360px] relative overflow-hidden block',
+          this.isDark ? 'bg-gray-900' : 'bg-gray-50',
+        ],
+        style: { height },
+      }),
+    ])
+  },
+}
+
+const infographicBlockNodeComponent = ref<any | null>(null)
+let infographicBlockNodeImport: Promise<void> | null = null
+
+function loadInfographicBlockNode() {
+  if (infographicBlockNodeComponent.value || infographicBlockNodeImport)
+    return
+  infographicBlockNodeImport = import('../../components/InfographicBlockNode')
+    .then(mod => (mod as any).default ?? mod)
+    .then((component) => {
+      infographicBlockNodeComponent.value = component
+    })
+    .catch((e) => {
+      console.warn(
+        '[markstream-vue2] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering.',
+        e,
+      )
+      infographicBlockNodeComponent.value = PreCodeNode
+    })
+}
+
+function resolveInfographicBlockNodeComponent() {
+  loadInfographicBlockNode()
+  return infographicBlockNodeComponent.value || InfographicBlockNodeLoading
 }
 
 async function D2BlockNodeAsync() {
@@ -1838,6 +1948,30 @@ function getRenderKey(node: ParsedNode, index: number) {
   return `${base}-${type}-${loading ? 'l' : 'r'}-${raw}-${content}-${children}-${items}-${rows}`
 }
 
+function getMermaidBindingsFor(node: ParsedNode) {
+  const bindings = { ...mermaidBindings.value } as Record<string, any>
+  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    bindings.estimatedPreviewHeightPx = clampMermaidPreviewHeight(
+      estimateMermaidPreviewHeight(String((node as any)?.code ?? '')),
+      undefined,
+      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
+    )
+  }
+  return bindings
+}
+
+function getInfographicBindingsFor(node: ParsedNode) {
+  const bindings = { ...infographicBindings.value } as Record<string, any>
+  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    bindings.estimatedPreviewHeightPx = clampInfographicPreviewHeight(
+      estimateInfographicPreviewHeight(String((node as any)?.code ?? '')),
+      undefined,
+      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
+    )
+  }
+  return bindings
+}
+
 // Decide which component to use for a given node. Ensure that code blocks
 // with language `mermaid` are rendered with `MermaidBlockNode` (unless a
 // custom component named `mermaid` is registered for the given customId).
@@ -1848,16 +1982,20 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
+    const customForLanguage = lang ? (customComponents as any)[lang] : undefined
+    if (customForLanguage)
+      return customForLanguage
+
     // Keep Mermaid blocks routed to MermaidBlockNode unless a specific
     // `mermaid` override is provided.
     if (lang === 'mermaid') {
       const customMermaid = (customComponents as any).mermaid
-      return customMermaid || MermaidBlockNodeAsync
+      return customMermaid || resolveMermaidBlockNodeComponent()
     }
 
     if (lang === 'infographic') {
       const customInfographic = (customComponents as any).infographic
-      return customInfographic || InfographicBlockNodeAsync
+      return customInfographic || resolveInfographicBlockNodeComponent()
     }
 
     if (lang === 'd2' || lang === 'd2lang') {
@@ -1886,10 +2024,10 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 function getBindingsFor(node: ParsedNode, language?: string) {
   const lang = language ?? getCodeBlockLanguage(node)
   if (lang === 'mermaid')
-    return mermaidBindings.value
+    return getMermaidBindingsFor(node)
 
   if (lang === 'infographic')
-    return infographicBindings.value
+    return getInfographicBindingsFor(node)
 
   if (lang === 'd2' || lang === 'd2lang')
     return d2Bindings.value

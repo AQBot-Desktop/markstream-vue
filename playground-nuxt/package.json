@@ -19,7 +19,6 @@
     "mermaid": "^11.13.0",
     "monaco-editor": "^0.52.2",
     "nuxt": "^4.4.2",
-    "shiki": "^3.23.0",
     "stream-markdown": "latest",
     "stream-monaco": "latest",
     "vue-i18n": "^11.3.0"

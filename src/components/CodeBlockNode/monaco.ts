@@ -1,5 +1,8 @@
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from '../../types/component-props'
 import { preload } from '../NodeRenderer/preloadMonaco'
+import { markCodeBlockRuntimeReady } from './runtime'
+
+export { isCodeBlockRuntimeReady } from './runtime'
 
 export interface MonacoDisposableLike {
   dispose?: () => void
@@ -63,36 +66,50 @@ export interface MonacoHelpers {
 export interface MonacoModule {
   useMonaco?: (options: MonacoRuntimeOptions) => MonacoHelpers | null | undefined
   detectLanguage?: (code: string) => string
+  preloadMonacoWorkers?: () => Promise<unknown> | unknown
 }
 
 let mod: MonacoModule | null = null
-let importAttempted = false
+let importFailed = false
 let loadingPromise: Promise<MonacoModule | null> | null = null
 
+export async function preloadCodeBlockRuntime() {
+  const runtime = await getUseMonaco()
+  return !!runtime
+}
+
 export async function getUseMonaco(): Promise<MonacoModule | null> {
-  if (mod)
-    return mod
   if (loadingPromise)
     return loadingPromise
-  if (importAttempted)
-    return null
 
   loadingPromise = (async () => {
+    if (!mod) {
+      if (importFailed)
+        return null
+      try {
+        mod = await import('stream-monaco') as MonacoModule
+      }
+      catch {
+        importFailed = true
+        return null
+      }
+    }
+
     try {
-      mod = await import('stream-monaco') as MonacoModule
       await preload(mod)
+      markCodeBlockRuntimeReady()
       return mod
     }
     catch {
-      importAttempted = true
-      // Return null to indicate the module is not available
-      // The caller should handle the fallback gracefully
+      // Keep the imported module cached so temporary preload failures can retry.
       return null
-    }
-    finally {
-      loadingPromise = null
     }
   })()
 
-  return loadingPromise
+  try {
+    return await loadingPromise
+  }
+  finally {
+    loadingPromise = null
+  }
 }

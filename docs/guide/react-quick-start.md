@@ -135,7 +135,7 @@ export default function MarkdownPage() {
 Install dependencies:
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 ```
 
 ```tsx

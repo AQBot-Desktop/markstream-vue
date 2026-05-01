@@ -22,7 +22,7 @@ Then continue with [Quick Start](/guide/quick-start) if you only need basic Mark
 
 | Capability | Packages | When you need it |
 |------------|----------|------------------|
-| Lightweight highlighted code blocks | `shiki`, `stream-markdown` | Docs sites, SSR, lower bundle budgets |
+| Lightweight highlighted code blocks | `stream-markdown` | Docs sites, SSR, lower bundle budgets |
 | Monaco-powered code blocks | `stream-monaco` | Copy/preview/expand controls and richer code UX |
 | Mermaid diagrams | `mermaid` | Fenced `mermaid` blocks |
 | D2 diagrams | `@terrastruct/d2` | Fenced `d2` or `d2lang` blocks |
@@ -33,7 +33,7 @@ Then continue with [Quick Start](/guide/quick-start) if you only need basic Mark
 ### Docs site or SSR-first app
 
 ```bash
-pnpm add markstream-vue shiki stream-markdown
+pnpm add markstream-vue stream-markdown
 ```
 
 Then continue with [Docs Site & VitePress](/guide/vitepress-docs-integration) if you are wiring a docs site, content hub, or VitePress theme.
@@ -55,7 +55,7 @@ pnpm add markstream-vue mermaid @terrastruct/d2 katex
 ### Everything enabled
 
 ```bash
-pnpm add markstream-vue shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ## 4. CSS order matters as much as installation

@@ -20,12 +20,12 @@
  *   node scripts/theme-gen/cli.mjs demo
  */
 
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { hslToShadcn, toHsl, toShadcnHsl, contrastRatio, hslObjToHex, toOklch, toOklchCss } from './color.mjs'
-import { generatePalette, BRIDGE_TOKENS, EXTENSION_TOKENS } from './palette.mjs'
+import { hslObjToHex, toHsl, toOklch, toOklchCss, toShadcnHsl } from './color.mjs'
 import { generateBothSchemes, validateContrast } from './dark.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -105,9 +105,12 @@ Usage: generate --name <name> --bg <hex> --fg <hex> --brand <hex>
 
   // Build font overrides if any --font-* flags provided
   const fonts = {}
-  if (opts['font-sans']) fonts.sans = opts['font-sans']
-  if (opts['font-mono']) fonts.mono = opts['font-mono']
-  if (opts['font-serif']) fonts.serif = opts['font-serif']
+  if (opts['font-sans'])
+    fonts.sans = opts['font-sans']
+  if (opts['font-mono'])
+    fonts.mono = opts['font-mono']
+  if (opts['font-serif'])
+    fonts.serif = opts['font-serif']
 
   const keyColors = {
     background: opts.bg,
@@ -219,9 +222,18 @@ function build(args) {
     const warns = [...lightReport, ...darkReport].filter(r => !r.passAA && r.severity === 'warn').length
 
     let status
-    if (errors > 0) { status = `✗ ${errors}`; failCount++ }
-    else if (warns > 0) { status = `~ ${warns}`; warnCount++ }
-    else { status = '✓'; passCount++ }
+    if (errors > 0) {
+      status = `✗ ${errors}`
+      failCount++
+    }
+    else if (warns > 0) {
+      status = `~ ${warns}`
+      warnCount++
+    }
+    else {
+      status = '✓'
+      passCount++
+    }
 
     const css = renderThemeCss(entry.id, light, dark)
     const path = resolve(outDir, `${entry.id}.css`)
@@ -236,7 +248,7 @@ function build(args) {
 
   // Also generate an index CSS that imports all themes
   const indexLines = entries.map(e => `@import './${e.id}.css';`)
-  writeFileSync(resolve(outDir, 'index.css'), indexLines.join('\n') + '\n')
+  writeFileSync(resolve(outDir, 'index.css'), `${indexLines.join('\n')}\n`)
   console.log(`Index written → themes/index.css`)
 }
 
@@ -339,10 +351,19 @@ function parseCssTokens(css) {
 
 function extractTokens(block) {
   const tokens = {}
-  const re = /--ms-([\w-]+)\s*:\s*([^;]+);/g
-  let m
-  while ((m = re.exec(block)) !== null) {
-    tokens[m[1]] = m[2].trim()
+  for (const line of block.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('--ms-'))
+      continue
+    const colonIndex = trimmed.indexOf(':')
+    const semicolonIndex = trimmed.lastIndexOf(';')
+    if (colonIndex === -1 || semicolonIndex === -1 || semicolonIndex <= colonIndex)
+      continue
+    const key = trimmed.slice('--ms-'.length, colonIndex).trim()
+    const value = trimmed.slice(colonIndex + 1, semicolonIndex).trim()
+    if (!key || !value)
+      continue
+    tokens[key] = value
   }
   return tokens
 }

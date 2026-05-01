@@ -1,4 +1,5 @@
 import { isKatexEnabled } from '../optional/katex'
+import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 export const WORKER_BUSY_CODE = 'WORKER_BUSY'
 
@@ -105,6 +106,7 @@ export function setKaTeXWorkerDebug(enabled: boolean) {
 }
 
 export async function renderKaTeXInWorker(content: string, displayMode = true, timeout = 2000, signal?: AbortSignal): Promise<string> {
+  const normalizedContent = normalizeKaTeXRenderInput(content)
   if (!isKatexEnabled()) {
     const error = new Error('KaTeX rendering disabled')
     ;(error as any).name = 'KaTeXDisabled'
@@ -115,7 +117,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
   if (workerInitError)
     return Promise.reject(workerInitError)
 
-  const cacheKey = `${displayMode ? 'd' : 'i'}:${content}`
+  const cacheKey = `${displayMode ? 'd' : 'i'}:${normalizedContent}`
   const cached = cache.get(cacheKey)
   if (cached)
     return cached
@@ -177,14 +179,14 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
     activeWorker.postMessage({
       id,
       type: 'render',
-      content,
+      content: normalizedContent,
       displayMode,
     })
   })
 }
 
 export function setKaTeXCache(content: string, displayMode = true, html: string) {
-  rememberCache(content, displayMode, html)
+  rememberCache(normalizeKaTeXRenderInput(content), displayMode, html)
 }
 
 export function getKaTeXWorkerLoad() {

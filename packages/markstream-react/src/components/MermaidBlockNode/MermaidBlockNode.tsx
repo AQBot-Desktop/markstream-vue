@@ -16,6 +16,7 @@ import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonToolti
 import { getLanguageIcon } from '../../utils/languageIcon'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread, findPrefixOffthread, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
+import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from './height'
 import { getMermaid } from './mermaid'
 
 type Theme = 'light' | 'dark'
@@ -224,6 +225,18 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const renderTimeout = props.renderTimeoutMs ?? DEFAULTS.renderTimeoutMs
   const fullRenderTimeout = props.fullRenderTimeoutMs ?? DEFAULTS.fullRenderTimeoutMs
   const renderDebounceMs = Math.max(0, props.renderDebounceMs ?? DEFAULTS.renderDebounceMs)
+  const maxPreviewHeight = useMemo(() => {
+    if (!props.maxHeight || props.maxHeight === 'none')
+      return null
+    return parsePositiveNumber(props.maxHeight)
+  }, [props.maxHeight])
+  const estimatedPreviewHeight = useMemo(() => {
+    return clampMermaidPreviewHeight(
+      parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(baseFixedCode),
+      undefined,
+      maxPreviewHeight,
+    )
+  }, [baseFixedCode, maxPreviewHeight, props.estimatedPreviewHeightPx])
 
   const [mermaidAvailable, setMermaidAvailable] = useState(false)
   const [showSource, setShowSource] = useState(false)
@@ -236,7 +249,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const [hasRenderedOnce, setHasRenderedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [containerHeight, setContainerHeight] = useState('360px')
+  const [containerHeight, setContainerHeight] = useState(`${estimatedPreviewHeight}px`)
   const [viewportReady, setViewportReady] = useState(typeof window === 'undefined')
 
   const mermaidRef = useRef<any>(null)
@@ -286,6 +299,17 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   }, [hasRenderedOnce])
 
   useEffect(() => {
+    if (showSource || isCollapsed)
+      return
+    setContainerHeight((current) => {
+      const currentHeight = parsePositiveNumber(current)
+      if (currentHeight != null && currentHeight >= estimatedPreviewHeight)
+        return current
+      return `${estimatedPreviewHeight}px`
+    })
+  }, [estimatedPreviewHeight, isCollapsed, showSource])
+
+  useEffect(() => {
     svgCacheRef.current = {}
   }, [theme, baseFixedCode, strictMode])
 
@@ -333,11 +357,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   }, [modalOpen])
 
   const resolveMaxContainerHeight = useCallback(() => {
-    if (!props.maxHeight || props.maxHeight === 'none')
-      return null
-    const maxHeight = Number.parseFloat(String(props.maxHeight))
-    return Number.isFinite(maxHeight) ? maxHeight : null
-  }, [props.maxHeight])
+    return maxPreviewHeight
+  }, [maxPreviewHeight])
 
   const updateContainerHeight = useCallback((newWidth?: number) => {
     const container = containerRef.current
@@ -379,8 +400,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     const resolved = Number.isFinite(target) && target > 0 ? target : intrinsicHeight
     const maxHeight = resolveMaxContainerHeight()
     const nextHeight = maxHeight == null ? resolved : Math.min(resolved, maxHeight)
-    setContainerHeight(`${nextHeight}px`)
-  }, [resolveMaxContainerHeight])
+    setContainerHeight(`${props.maxHeight === 'none' ? nextHeight : Math.max(nextHeight, estimatedPreviewHeight)}px`)
+  }, [estimatedPreviewHeight, props.maxHeight, resolveMaxContainerHeight])
 
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === 'undefined')
@@ -1081,6 +1102,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   return (
     <>
       <div
+        data-markstream-mermaid="1"
+        data-markstream-mode={showSource ? 'source' : hasRenderedOnce ? 'preview' : 'pending'}
         className={clsx(
           'my-4 rounded-lg border overflow-hidden shadow-sm mermaid-block',
           { 'is-dark': props.isDark, 'is-rendering': streaming },

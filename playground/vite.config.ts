@@ -67,8 +67,13 @@ export default defineConfig(({ command }) => {
       },
     },
     optimizeDeps: {
-      // Keep dev linked to stream-monaco source so local edits hot-reload cleanly.
-      exclude: streamMonacoAlias === localStreamMonacoSource ? ['stream-monaco'] : [],
+      // Keep workspace-linked parser/runtime packages on source files in dev so
+      // fixes in the monorepo are reflected immediately instead of getting
+      // stuck behind Vite's optimized-deps cache.
+      exclude: [
+        'stream-markdown-parser',
+        ...(streamMonacoAlias === localStreamMonacoSource ? ['stream-monaco'] : []),
+      ],
     },
     plugins: [
       Vue({}),

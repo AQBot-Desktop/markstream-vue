@@ -107,4 +107,25 @@ describe('markdownCodeBlockNode tooltip toggles', () => {
     expect(shellWrapper.text()).not.toContain('Shellscript')
     shellWrapper.unmount()
   })
+
+  it('keeps fallback and rendered code in the same content layer', async () => {
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: true,
+        stream: false,
+        node: makeNode(),
+      },
+    })
+
+    await nextTick()
+
+    const content = wrapper.get('.code-block-content')
+    const renderer = wrapper.get('.code-block-render')
+    const fallback = wrapper.get('.code-fallback-plain')
+    expect(renderer.element.parentElement).toBe(content.element)
+    expect(fallback.element.parentElement).toBe(content.element)
+    expect(fallback.find('pre.shiki-fallback').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
 })

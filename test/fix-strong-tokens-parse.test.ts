@@ -18,15 +18,15 @@ describe('fixStrongTokens plugin (parse-token assertions)', () => {
     expect(text.content).toBe('b_c')
   })
 
-  it('parses malformed emphasis without throwing and returns tokens', () => {
+  it('keeps malformed emphasis with an invalid closer as text', () => {
     const md = getMarkdown('t')
     const content = 'this is *a test * with unmatched star'
     const nodes = parseMarkdownToStructure(content, md)
     // basic sanity: nodes array exists and contains at least one paragraph/inline-derived node
     const emphasis = nodes[0].children?.find((c: any) => c.type === 'emphasis')
-    expect(emphasis.type).toBe('emphasis')
-    expect(emphasis.children?.[0].content).toBe('a test ')
-    expect(emphasis.raw).toBe('*a test *')
+    expect(emphasis).toBeUndefined()
+    expect(nodes[0].children?.[0].type).toBe('text')
+    expect(nodes[0].children?.[0].content).toBe(content)
   })
 
   it('parses strong around inline HTML tag: `**<font color="red">hi</font>**`', () => {

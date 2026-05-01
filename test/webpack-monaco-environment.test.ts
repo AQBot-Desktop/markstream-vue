@@ -7,10 +7,25 @@ describe('webpack MonacoEnvironment interop', () => {
 
     const streamMonaco = await import('stream-monaco')
     ;(streamMonaco.preloadMonacoWorkers as any).mockClear?.()
-    const { getUseMonaco } = await import('../src/components/CodeBlockNode/monaco')
+    const { getUseMonaco, isCodeBlockRuntimeReady } = await import('../src/components/CodeBlockNode/monaco')
 
     await getUseMonaco()
 
+    expect(streamMonaco.preloadMonacoWorkers).toHaveBeenCalledTimes(1)
+    expect(isCodeBlockRuntimeReady()).toBe(true)
+  })
+
+  it('exposes a code block runtime preload API', async () => {
+    vi.resetModules()
+    delete (globalThis as any).MonacoEnvironment
+
+    const streamMonaco = await import('stream-monaco')
+    ;(streamMonaco.preloadMonacoWorkers as any).mockClear?.()
+    const { isCodeBlockRuntimeReady, preloadCodeBlockRuntime } = await import('../src/components/CodeBlockNode/monaco')
+
+    expect(isCodeBlockRuntimeReady()).toBe(false)
+    await expect(preloadCodeBlockRuntime()).resolves.toBe(true)
+    expect(isCodeBlockRuntimeReady()).toBe(true)
     expect(streamMonaco.preloadMonacoWorkers).toHaveBeenCalledTimes(1)
   })
 
@@ -38,5 +53,25 @@ describe('webpack MonacoEnvironment interop', () => {
     await getUseMonaco()
 
     expect(streamMonaco.preloadMonacoWorkers).not.toHaveBeenCalled()
+  })
+
+  it('retries preload after a transient worker warmup failure', async () => {
+    vi.resetModules()
+    delete (globalThis as any).MonacoEnvironment
+
+    const streamMonaco = await import('stream-monaco')
+    const preloadMock = streamMonaco.preloadMonacoWorkers as any
+    preloadMock.mockReset()
+    preloadMock
+      .mockRejectedValueOnce(new Error('warmup failed'))
+      .mockResolvedValue(undefined)
+
+    const { getUseMonaco, isCodeBlockRuntimeReady } = await import('../src/components/CodeBlockNode/monaco')
+
+    await expect(getUseMonaco()).resolves.toBeNull()
+    expect(isCodeBlockRuntimeReady()).toBe(false)
+    await expect(getUseMonaco()).resolves.toBe(streamMonaco)
+    expect(isCodeBlockRuntimeReady()).toBe(true)
+    expect(preloadMock).toHaveBeenCalledTimes(2)
   })
 })

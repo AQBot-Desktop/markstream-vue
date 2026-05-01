@@ -267,6 +267,7 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
       const token = s.push('reference', 'span', 0)
       token.content = id
       token.markup = match[0]
+      token.raw = match[0]
     }
     s.pos += match[0].length
     return true

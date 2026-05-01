@@ -17,15 +17,20 @@ import type {
 import type { NodeComponentProps } from '../types/node-component'
 import React from 'react'
 import {
-  getHtmlTagFromContent,
   getMarkdown,
   mergeCustomHtmlTags,
+  NON_STRUCTURING_HTML_TAGS,
   parseMarkdownToStructure,
+  sanitizeHtmlTokenAttrs,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
 } from 'stream-markdown-parser'
+import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber as parsePositiveInfographicNumber } from '../components/InfographicBlockNode/height'
+import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber as parsePositiveMermaidNumber } from '../components/MermaidBlockNode/height'
 import { getCustomNodeComponents } from '../customComponents'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
+import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
+import { normalizeDomAttrs } from '../utils/htmlToReact'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { parseHtmlToReactNodes } from './html'
 import { renderKatexToHtml } from './katex'
@@ -84,6 +89,14 @@ function renderStaticCodeShell(
   )
 }
 
+function mergeHtmlBlockWrapperProps(attrs?: [string, string | null][] | null) {
+  const normalized = normalizeDomAttrs((tokenAttrsToProps(sanitizeHtmlTokenAttrs(attrs ?? undefined)) as Record<string, string> | undefined) || {})
+  const next = { ...normalized }
+  const existing = typeof next.className === 'string' ? next.className.trim() : ''
+  next.className = existing ? `html-block-node ${existing}` : 'html-block-node'
+  return next
+}
+
 function createRenderContext(
   props: NodeRendererProps,
   customComponents: Record<string, React.ComponentType<any>>,
@@ -128,21 +141,51 @@ function createRenderContext(
   }
 }
 
+function getMermaidRenderProps(node: any, ctx: RenderContext) {
+  const next = { ...(ctx.mermaidProps || {}) } as Record<string, any>
+  if (parsePositiveMermaidNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampMermaidPreviewHeight(
+      estimateMermaidPreviewHeight(String(node?.code ?? '')),
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveMermaidNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
+}
+
+function getInfographicRenderProps(node: any, ctx: RenderContext) {
+  const next = { ...(ctx.infographicProps || {}) } as Record<string, any>
+  if (parsePositiveInfographicNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampInfographicPreviewHeight(
+      estimateInfographicPreviewHeight(String(node?.code ?? '')),
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveInfographicNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
+}
+
 function renderCodeBlock(
   node: any,
   key: React.Key,
   ctx: RenderContext,
   customComponents: Record<string, any>,
 ) {
-  const language = normalizeLanguageIdentifier(String(node.language || ''))
+  const trimmedLanguage = String(node?.language || '').trim()
+  const rawLanguage = trimmedLanguage
+    ? String(trimmedLanguage.split(/\s+/)[0] ?? '').split(':')[0].toLowerCase()
+    : ''
+  const language = normalizeLanguageIdentifier(rawLanguage)
+  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
   if (language === 'mermaid') {
-    const customMermaid = customComponents.mermaid
+    const mermaidProps = getMermaidRenderProps(node, ctx)
+    const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid) {
       return React.createElement(customMermaid as any, {
         key,
         node,
         isDark: ctx.isDark,
-        ...(ctx.mermaidProps || {}),
+        ...mermaidProps,
       })
     }
     return (
@@ -151,19 +194,20 @@ function renderCodeBlock(
         node={node as any}
         isDark={ctx.isDark}
         loading={Boolean(node.loading)}
-        {...(ctx.mermaidProps || {})}
+        {...mermaidProps}
       />
     )
   }
 
   if (language === 'infographic') {
-    const customInfographic = customComponents.infographic
+    const infographicProps = getInfographicRenderProps(node, ctx)
+    const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic) {
       return React.createElement(customInfographic as any, {
         key,
         node,
         isDark: ctx.isDark,
-        ...(ctx.infographicProps || {}),
+        ...infographicProps,
       })
     }
     return (
@@ -172,13 +216,13 @@ function renderCodeBlock(
         node={node as any}
         isDark={ctx.isDark}
         loading={Boolean(node.loading)}
-        {...(ctx.infographicProps || {})}
+        {...infographicProps}
       />
     )
   }
 
   if (language === 'd2' || language === 'd2lang') {
-    const customD2 = customComponents.d2
+    const customD2 = customForLanguage || customComponents.d2
     if (customD2) {
       return React.createElement(customD2 as any, {
         key,
@@ -196,6 +240,33 @@ function renderCodeBlock(
         {...(ctx.d2Props || {})}
       />
     )
+  }
+
+  if (customForLanguage) {
+    return React.createElement(customForLanguage as any, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+    })
+  }
+
+  const customCodeBlock = customComponents.code_block
+  if (customCodeBlock) {
+    return React.createElement(customCodeBlock as any, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+    })
   }
 
   if (ctx.renderCodeBlocksAsPre)
@@ -293,6 +364,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   const nodeChildren = node.children ?? []
+  const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
   const parts: React.ReactNode[] = []
   const inlineBuffer: ParsedNode[] = []
 
@@ -309,7 +381,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type)) {
+    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, customComponents, ctx.customHtmlTags)) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>
@@ -856,7 +928,36 @@ export function ReferenceNode(props: NodeComponentProps<{ type: 'reference', id:
   )
 }
 
-export function HtmlBlockNode(props: NodeComponentProps<{ type: 'html_block', content?: string }>) {
+export function HtmlBlockNode(props: NodeComponentProps<{
+  type: 'html_block'
+  content?: string
+  tag?: string
+  attrs?: [string, string | null][] | null
+  children?: ParsedNode[]
+}>) {
+  const structuredTag = String((props.node as any)?.tag ?? '').trim().toLowerCase()
+  const structuredChildren = Array.isArray((props.node as any)?.children)
+    ? ((props.node as any).children as ParsedNode[])
+    : []
+  if (
+    structuredChildren.length > 0
+    && structuredTag
+    && !NON_STRUCTURING_HTML_TAGS.has(structuredTag)
+    && props.ctx
+    && props.renderNode
+  ) {
+    return React.createElement(
+      structuredTag,
+      mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null),
+      renderNodeChildren(
+        structuredChildren,
+        props.ctx,
+        `${String(props.indexKey ?? 'html-block')}-structured`,
+        props.renderNode,
+      ),
+    )
+  }
+
   const customComponents = getCustomNodeComponents(props.customId)
   const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents)
   if (nodes == null)
@@ -919,7 +1020,9 @@ export function FallbackComponent(props: NodeComponentProps<{ type: string }>) {
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
-  const custom = (customComponents as Record<string, any>)[node.type]
+  const custom = node.type === 'code_block'
+    ? null
+    : (customComponents as Record<string, any>)[node.type]
   if (custom) {
     return React.createElement(custom, {
       key,
@@ -934,9 +1037,10 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const tag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
-    const isWhitelisted = (ctx.customHtmlTags ?? []).some((t: string) => t.toLowerCase() === tag)
-    const customForTag = tag ? (customComponents as Record<string, any>)[tag] : null
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const tag = resolvedCustomTag?.tag ?? ''
+    const isWhitelisted = resolvedCustomTag?.isWhitelisted ?? false
+    const customForTag = resolvedCustomTag?.component ?? null
     if (isWhitelisted && customForTag) {
       const coerced = {
         ...(node as any),
@@ -1068,7 +1172,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'reference':
       return <ReferenceNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} />
     case 'html_block':
-      return <HtmlBlockNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'html_inline':
       return <HtmlInlineNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'vmr_container':

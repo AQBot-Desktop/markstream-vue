@@ -1,3 +1,5 @@
+import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
+
 let katexModule: any | undefined
 let katexLoadAttempted = false
 
@@ -50,7 +52,8 @@ export function renderKatexToHtml(
   displayMode: boolean,
   throwOnError: boolean,
 ) {
-  if (!content)
+  const normalizedContent = normalizeKaTeXRenderInput(content)
+  if (!normalizedContent)
     return null
   if ((globalThis as any).__MARKSTREAM_REACT_DISABLE_SYNC_KATEX__)
     return null
@@ -60,7 +63,7 @@ export function renderKatexToHtml(
     return null
 
   try {
-    return katex.renderToString(content, {
+    return katex.renderToString(normalizedContent, {
       displayMode,
       throwOnError,
     })

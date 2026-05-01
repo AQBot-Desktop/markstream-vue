@@ -5,7 +5,7 @@ import { getString } from '../shared/node-helpers'
 @Component({
   selector: 'markstream-angular-reference-node',
   standalone: true,
-  template: '<sup class="markstream-nested-reference">[{{ id }}]</sup>',
+  template: '<span class="markstream-nested-reference">{{ id }}</span>',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReferenceNodeComponent {

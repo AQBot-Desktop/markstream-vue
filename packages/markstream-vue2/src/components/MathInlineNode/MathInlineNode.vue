@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { getCachedMathRender, setCachedMathRender } from '../../utils/mathRenderCache'
+import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 import { getKatex } from './katex'
 
@@ -26,6 +27,7 @@ let isUnmounted = false
 let currentAbortController: AbortController | null = null
 
 const displayMode = computed(() => props.node.markup === '$$')
+const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
 const cacheKey = computed(() => {
   if (props.indexKey == null)
     return null
@@ -43,12 +45,12 @@ async function renderWithMainThreadFallback() {
   if (!katex)
     return false
   try {
-    const html = katex.renderToString(props.node.content, {
+    const html = katex.renderToString(mathContent.value, {
       throwOnError: props.node.loading,
       displayMode: displayMode.value,
     })
     applySuccessfulRender(html)
-    setKaTeXCache(props.node.content, displayMode.value, html)
+    setKaTeXCache(mathContent.value, displayMode.value, html)
     return true
   }
   catch {
@@ -107,7 +109,7 @@ async function renderMath() {
   }
 
   try {
-    const html = await renderKaTeXWithBackpressure(props.node.content, displayMode.value, {
+    const html = await renderKaTeXWithBackpressure(mathContent.value, displayMode.value, {
       timeout: 1500,
       waitTimeout: 0,
       maxRetries: 0,

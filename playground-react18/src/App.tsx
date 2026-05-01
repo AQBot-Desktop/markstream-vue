@@ -7,6 +7,7 @@ import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThinkingNode } from './components/ThinkingNode'
 import { streamContent } from './markdown'
+import { PLAYGROUND_CUSTOM_HTML_TAGS, PLAYGROUND_CUSTOM_ID } from './shared/markstreamPlayground'
 import { MigrationDemoPage } from './shared/MigrationDemoPage'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './shared/streamPresets'
 import { TestLab } from './shared/TestLab'
@@ -15,7 +16,6 @@ import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './
 
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
-const PLAYGROUND_CUSTOM_ID = 'playground-demo'
 setCustomComponents(PLAYGROUND_CUSTOM_ID, {
   thinking: ThinkingNode,
 })
@@ -744,6 +744,7 @@ export default function App() {
                 themes={themeOptions}
                 isDark={isDark}
                 customId={PLAYGROUND_CUSTOM_ID}
+                customHtmlTags={PLAYGROUND_CUSTOM_HTML_TAGS}
                 deferNodesUntilVisible={false}
                 maxLiveNodes={2000}
                 liveNodeBuffer={200}

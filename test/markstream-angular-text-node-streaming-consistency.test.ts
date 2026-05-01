@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -41,5 +42,15 @@ describe('markstream-angular text node streaming consistency', () => {
 
     expect(component.settledText).toBe('记忆化递归（动态规划）')
     expect(component.streamedDelta).toBe('')
+  })
+
+  it('ships pre-wrap text styles so softbreaks stay visible in Angular', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'packages/markstream-angular/src/index.css'),
+      'utf8',
+    )
+
+    expect(css).toContain('.markstream-angular .markstream-angular-text-node')
+    expect(css).toContain('white-space: pre-wrap;')
   })
 })

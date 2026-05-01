@@ -13,7 +13,7 @@ If you only render static articles or docs pages, go back to [Usage & Streaming]
 | Need | Packages | Best for |
 | --- | --- | --- |
 | Text-only or lightweight chat UI | `markstream-vue` | Basic Markdown, lists, links, blockquotes |
-| Syntax-highlighted code without Monaco | `markstream-vue shiki stream-markdown` | SSR-friendly transcripts, lower bundle budgets |
+| Syntax-highlighted code without Monaco | `markstream-vue stream-markdown` | SSR-friendly transcripts, lower bundle budgets |
 | Rich code interactions | `markstream-vue stream-monaco` | Copy, preview, diff, and Monaco-powered code blocks |
 | Diagrams or math in chat output | `markstream-vue mermaid katex` | Mermaid fences and KaTeX formulas |
 
@@ -63,7 +63,7 @@ Why this path works better:
 
 ### Better code blocks
 
-- Want a lighter docs-style look: use `MarkdownCodeBlockNode` with `shiki` + `stream-markdown`
+- Want a lighter docs-style look: use `MarkdownCodeBlockNode` with `stream-markdown`
 - Want richer preview/diff controls: use `CodeBlockNode` with `stream-monaco`
 
 See [Renderer & Node Components](/guide/components) for the trade-offs.

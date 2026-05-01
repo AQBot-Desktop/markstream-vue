@@ -17,7 +17,24 @@ export type TestPageViewMode = 'lab' | 'preview'
 const FALLBACK_ORIGIN = 'https://markstream.local'
 const RAW_PREFIX = 'raw:'
 const DEFLATE_PREFIX = 'z:'
+const BROTLI_PREFIX = 'br:'
 const BASE64_CHUNK_SIZE = 0x8000
+
+interface BrotliCompressModule {
+  compress: (input: Uint8Array, options?: { quality?: number }) => Promise<Uint8Array>
+  decompress: (input: Uint8Array) => Promise<Uint8Array>
+  default?: BrotliCompressModule
+}
+
+let brotliCompressPromise: Promise<BrotliCompressModule> | null = null
+
+async function loadBrotliCompress() {
+  brotliCompressPromise ||= import('brotli-compress').then((module) => {
+    const loaded = module as BrotliCompressModule
+    return loaded.compress ? loaded : loaded.default!
+  })
+  return brotliCompressPromise
+}
 
 function encodeBase64Url(bytes: Uint8Array) {
   let binary = ''
@@ -54,6 +71,17 @@ function encodeDeflatedPayload(markdown: string) {
   }
 }
 
+async function encodeBrotliPayload(markdown: string) {
+  try {
+    const brotli = await loadBrotliCompress()
+    const compressed = await brotli.compress(new TextEncoder().encode(markdown), { quality: 11 })
+    return `${BROTLI_PREFIX}${encodeBase64Url(compressed)}`
+  }
+  catch {
+    return ''
+  }
+}
+
 export function isLocalHost(hostname: string) {
   return hostname === 'localhost' || hostname === '127.0.0.1'
 }
@@ -74,8 +102,26 @@ export function encodeMarkdownPayload(markdown: string) {
   return candidates.reduce((shortest, candidate) => candidate.length < shortest.length ? candidate : shortest)
 }
 
+export async function encodeMarkdownPayloadAsync(markdown: string) {
+  if (!markdown)
+    return ''
+
+  const currentPayload = encodeMarkdownPayload(markdown)
+  const brotliPayload = await encodeBrotliPayload(markdown)
+  const candidates = [currentPayload, brotliPayload].filter(Boolean)
+  if (!candidates.length)
+    return ''
+
+  return candidates.reduce((shortest, candidate) => candidate.length < shortest.length ? candidate : shortest)
+}
+
 export function createMarkdownHash(markdown: string) {
   const payload = encodeMarkdownPayload(markdown)
+  return payload ? `data=${payload}` : ''
+}
+
+export async function createMarkdownHashAsync(markdown: string) {
+  const payload = await encodeMarkdownPayloadAsync(markdown)
   return payload ? `data=${payload}` : ''
 }
 
@@ -103,6 +149,9 @@ export function decodeMarkdownHash(hash: string) {
     }
   }
 
+  if (payload.startsWith(BROTLI_PREFIX))
+    return null
+
   try {
     return decompressFromEncodedURIComponent(payload) || null
   }
@@ -111,8 +160,41 @@ export function decodeMarkdownHash(hash: string) {
   }
 }
 
+export async function decodeMarkdownHashAsync(hash: string) {
+  const matched = (hash || '').match(/^#?data=([^&]+)/)
+  if (!matched?.[1])
+    return null
+
+  const payload = matched[1]
+  if (!payload.startsWith(BROTLI_PREFIX))
+    return decodeMarkdownHash(hash)
+
+  try {
+    const brotli = await loadBrotliCompress()
+    return new TextDecoder().decode(await brotli.decompress(decodeBase64Url(payload.slice(BROTLI_PREFIX.length))))
+  }
+  catch {
+    return null
+  }
+}
+
 export function withMarkdownHash(baseUrl: string, markdown: string) {
   const nextHash = createMarkdownHash(markdown)
+  if (!nextHash)
+    return baseUrl
+
+  const isAbsolute = /^[a-z]+:\/\//i.test(baseUrl)
+  const url = new URL(baseUrl, FALLBACK_ORIGIN)
+  url.hash = nextHash
+
+  if (isAbsolute)
+    return url.toString()
+
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+export async function withMarkdownHashAsync(baseUrl: string, markdown: string) {
+  const nextHash = await createMarkdownHashAsync(markdown)
   if (!nextHash)
     return baseUrl
 
@@ -152,6 +234,14 @@ export function buildTestPageHref(
   viewMode: TestPageViewMode = 'lab',
 ) {
   return withMarkdownHash(withTestPageViewMode(baseUrl, viewMode), markdown)
+}
+
+export async function buildTestPageHrefAsync(
+  baseUrl: string,
+  markdown: string,
+  viewMode: TestPageViewMode = 'lab',
+) {
+  return withMarkdownHashAsync(withTestPageViewMode(baseUrl, viewMode), markdown)
 }
 
 export function resolveFrameworkTestHref(

@@ -107,6 +107,8 @@ const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
 - `d2-props`：透传给 `D2BlockNode`
 - `infographic-props`：透传给 `InfographicBlockNode`
 
+对于 Mermaid 和 Infographic 围栏，调用方未传入时 `MarkdownRender` 会自动注入 `estimatedPreviewHeightPx`，用于为异步加载和重新挂载预留稳定的首屏 preview 高度。自定义 `mermaid` / `infographic` 渲染器也会收到这个 prop；如果自定义块自己渲染 preview shell，应继续转发或使用它。
+
 示例：
 
 ```vue

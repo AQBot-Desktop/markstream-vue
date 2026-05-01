@@ -1,5 +1,7 @@
 import type { NodeComponentProps } from 'markstream-react'
+import type { ReactNode } from 'react'
 import { NodeRenderer } from 'markstream-react'
+import { PLAYGROUND_CUSTOM_HTML_TAGS } from '../../../playground-react18/src/shared/markstreamPlayground'
 
 interface ThinkingNodeData {
   node: {
@@ -10,13 +12,29 @@ interface ThinkingNodeData {
   }
 }
 
-export function ThinkingNode(props: NodeComponentProps<ThinkingNodeData['node']>) {
-  const { node } = props
+type ThinkingNodeProps = Partial<NodeComponentProps<ThinkingNodeData['node']>> & {
+  children?: ReactNode
+}
+
+function getResolvedNode(props: ThinkingNodeProps): ThinkingNodeData['node'] {
+  if (props.node)
+    return props.node
+
+  return {
+    type: 'thinking',
+    content: '',
+    loading: false,
+  }
+}
+
+export function ThinkingNode(props: ThinkingNodeProps) {
+  const node = getResolvedNode(props)
   const dotsClass = node.loading ? 'thinking-dots visible' : 'thinking-dots hidden'
   const ctx = props.ctx
   const inheritedCustomId = props.customId ?? ctx?.customId
   const inheritedIsDark = props.isDark ?? ctx?.isDark
   const inheritedTypewriter = props.typewriter ?? ctx?.typewriter ?? true
+  const hasStructuredNode = Boolean(props.node)
 
   return (
     <div className="thinking-node p-4 my-4 bg-blue-50 dark:bg-blue-900/40 rounded-md border-l-4 border-blue-400 flex items-start gap-3">
@@ -48,25 +66,30 @@ export function ThinkingNode(props: NodeComponentProps<ThinkingNodeData['node']>
         <div className="mt-1 text-sm leading-relaxed text-slate-800 dark:text-slate-100">
           {node.loading && <span className="sr-only" aria-live="polite">Thinking…</span>}
           <div className="content-area">
-            <NodeRenderer
-              content={String(node.content ?? '')}
-              customId={inheritedCustomId}
-              isDark={inheritedIsDark}
-              themes={ctx?.codeBlockThemes?.themes}
-              codeBlockDarkTheme={ctx?.codeBlockThemes?.darkTheme}
-              codeBlockLightTheme={ctx?.codeBlockThemes?.lightTheme}
-              codeBlockMonacoOptions={ctx?.codeBlockThemes?.monacoOptions}
-              codeBlockMinWidth={ctx?.codeBlockThemes?.minWidth}
-              codeBlockMaxWidth={ctx?.codeBlockThemes?.maxWidth}
-              codeBlockProps={ctx?.codeBlockProps}
-              codeBlockStream={ctx?.codeBlockStream}
-              renderCodeBlocksAsPre={ctx?.renderCodeBlocksAsPre}
-              typewriter={inheritedTypewriter}
-              viewportPriority={false}
-              deferNodesUntilVisible={false}
-              batchRendering={false}
-              maxLiveNodes={0}
-            />
+            {hasStructuredNode
+              ? (
+                  <NodeRenderer
+                    content={String(node.content ?? '')}
+                    customId={inheritedCustomId}
+                    customHtmlTags={PLAYGROUND_CUSTOM_HTML_TAGS}
+                    isDark={inheritedIsDark}
+                    themes={ctx?.codeBlockThemes?.themes}
+                    codeBlockDarkTheme={ctx?.codeBlockThemes?.darkTheme}
+                    codeBlockLightTheme={ctx?.codeBlockThemes?.lightTheme}
+                    codeBlockMonacoOptions={ctx?.codeBlockThemes?.monacoOptions}
+                    codeBlockMinWidth={ctx?.codeBlockThemes?.minWidth}
+                    codeBlockMaxWidth={ctx?.codeBlockThemes?.maxWidth}
+                    codeBlockProps={ctx?.codeBlockProps}
+                    codeBlockStream={ctx?.codeBlockStream}
+                    renderCodeBlocksAsPre={ctx?.renderCodeBlocksAsPre}
+                    typewriter={inheritedTypewriter}
+                    viewportPriority={false}
+                    deferNodesUntilVisible={false}
+                    batchRendering={false}
+                    maxLiveNodes={0}
+                  />
+                )
+              : props.children}
           </div>
         </div>
       </div>

@@ -1,2 +1,2 @@
+export { getRegisteredThemes, registerIconTheme, setIconTheme } from './registry'
 export type { IconTheme, LanguageIconMap } from './types'
-export { registerIconTheme, setIconTheme, getRegisteredThemes } from './registry'

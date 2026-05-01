@@ -5,7 +5,7 @@
 Code blocks can be rendered in three ways depending on which optional dependencies you install and how you configure the library:
 
 - Monaco (recommended for large/interactive code blocks): installs and uses `stream-monaco` to provide an editor-like, incremental rendering experience. The library lazy-loads `stream-monaco` at runtime when available.
-- Shiki (MarkdownCodeBlockNode): install `shiki` + `stream-markdown` and override the `code_block` node via `setCustomComponents` to use a lightweight Markdown-driven renderer.
+- Shiki (MarkdownCodeBlockNode): install `stream-markdown` and override the `code_block` node via `setCustomComponents` to use a lightweight Markdown-driven renderer.
 - Fallback (no extra deps): if neither optional package is installed, code blocks render as plain `<pre><code>` blocks (basic styling / no Monaco features).
 
 ## Monaco (recommended)
@@ -28,9 +28,9 @@ npm i stream-monaco
 - Install:
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 # or
-npm i shiki stream-markdown
+npm i stream-markdown
 ```
 
 - Override the `code_block` node via `setCustomComponents` to register the Shiki-based renderer:

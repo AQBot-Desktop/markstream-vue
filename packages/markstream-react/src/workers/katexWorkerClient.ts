@@ -1,3 +1,5 @@
+import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
+
 interface Pending {
   resolve: (val: string) => void
   reject: (err: any) => void
@@ -102,16 +104,17 @@ export const WORKER_BUSY_CODE = 'WORKER_BUSY'
 
 export async function renderKaTeXInWorker(content: string, displayMode = true, timeout = 2000, signal?: AbortSignal): Promise<string> {
   const startTime = performance.now()
+  const normalizedContent = normalizeKaTeXRenderInput(content)
   if (workerInitError)
     return Promise.reject(workerInitError)
-  const cacheKey = `${displayMode ? 'd' : 'i'}:${content}`
+  const cacheKey = `${displayMode ? 'd' : 'i'}:${normalizedContent}`
   const cached = cache.get(cacheKey)
   if (cached) {
     if (perfMonitor) {
       perfMonitor.recordRender({
         type: 'cache-hit',
         duration: performance.now() - startTime,
-        formulaLength: content.length,
+        formulaLength: normalizedContent.length,
         timestamp: Date.now(),
         success: true,
       })
@@ -132,7 +135,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       perfMonitor.recordRender({
         type: 'worker',
         duration: performance.now() - startTime,
-        formulaLength: content.length,
+        formulaLength: normalizedContent.length,
         timestamp: Date.now(),
         success: false,
         error: 'busy',
@@ -158,7 +161,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
         perfMonitor.recordRender({
           type: 'worker',
           duration: performance.now() - startTime,
-          formulaLength: content.length,
+          formulaLength: normalizedContent.length,
           timestamp: Date.now(),
           success: false,
           error: 'timeout',
@@ -190,7 +193,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
           perfMonitor.recordRender({
             type: 'worker',
             duration: performance.now() - startTime,
-            formulaLength: content.length,
+            formulaLength: normalizedContent.length,
             timestamp: Date.now(),
             success: true,
           })
@@ -204,7 +207,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
           perfMonitor.recordRender({
             type: 'worker',
             duration: performance.now() - startTime,
-            formulaLength: content.length,
+            formulaLength: normalizedContent.length,
             timestamp: Date.now(),
             success: false,
             error: err?.code || err?.message,
@@ -216,7 +219,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
     })
 
     try {
-      wk.postMessage({ id, content, displayMode, debug: DEBUG_KATEX_WORKER })
+      wk.postMessage({ id, content: normalizedContent, displayMode, debug: DEBUG_KATEX_WORKER })
     }
     catch (err) {
       pending.delete(id)
@@ -230,7 +233,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
 }
 
 export function setKaTeXCache(content: string, displayMode: boolean, html: string) {
-  const cacheKey = `${displayMode ? 'd' : 'i'}:${content}`
+  const cacheKey = `${displayMode ? 'd' : 'i'}:${normalizeKaTeXRenderInput(content)}`
   cache.set(cacheKey, html)
   if (cache.size > CACHE_MAX) {
     const firstKey = cache.keys().next().value

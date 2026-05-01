@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushAll } from './setup/flush-all'
 
 interface Entry { target: Element, isIntersecting: boolean, intersectionRatio: number }
@@ -40,7 +40,17 @@ class FakeIntersectionObserver {
   }
 }
 
+beforeEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+  vi.resetModules()
+  FakeIntersectionObserver.instances = []
+})
+
 afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+  vi.resetModules()
   FakeIntersectionObserver.instances = []
 })
 

@@ -97,24 +97,26 @@ export function generatePalette(input) {
 
   if (input.info) {
     const c = toHsl(input.info)
-    extensionTokens['info'] = c
+    extensionTokens.info = c
     extensionTokens['info-foreground'] = derivePrimaryForeground(c)
   }
   if (input.success) {
     const c = toHsl(input.success)
-    extensionTokens['success'] = c
+    extensionTokens.success = c
     extensionTokens['success-foreground'] = derivePrimaryForeground(c)
   }
   if (input.warning) {
     const c = toHsl(input.warning)
-    extensionTokens['warning'] = c
+    extensionTokens.warning = c
     extensionTokens['warning-foreground'] = derivePrimaryForeground(c)
   }
-  if (input.diffAdded) extensionTokens['diff-added'] = toHsl(input.diffAdded)
-  if (input.diffRemoved) extensionTokens['diff-removed'] = toHsl(input.diffRemoved)
+  if (input.diffAdded)
+    extensionTokens['diff-added'] = toHsl(input.diffAdded)
+  if (input.diffRemoved)
+    extensionTokens['diff-removed'] = toHsl(input.diffRemoved)
   if (input.highlight) {
     const c = toHsl(input.highlight)
-    extensionTokens['highlight'] = c
+    extensionTokens.highlight = c
     extensionTokens['highlight-foreground'] = derivePrimaryForeground(c)
   }
 
@@ -154,7 +156,7 @@ export function generatePalette(input) {
 
   // Radius token
   if (input.radius)
-    colorTokens['radius'] = input.radius
+    colorTokens.radius = input.radius
 
   return colorTokens
 }
@@ -178,9 +180,11 @@ function ensureContrast(color, reference, target, darken) {
   let c = { ...color }
   const coarseStep = darken ? -1 : 1
   for (let i = 0; i < 100; i++) {
-    if (contrastRatio(c, reference) >= effectiveTarget) return c
+    if (contrastRatio(c, reference) >= effectiveTarget)
+      return c
     c = adjustLightness(c, coarseStep)
-    if (c.l <= 0 || c.l >= 100) return c
+    if (c.l <= 0 || c.l >= 100)
+      return c
   }
   return c
 }
@@ -277,7 +281,8 @@ function deriveLink(brand, bg, fg, isLight) {
       for (let l = 0; l <= 100; l++) {
         const candidate = { h: sh, s, l }
         const crBg = contrastRatio(candidate, bg)
-        if (crBg < 4.5) continue
+        if (crBg < 4.5)
+          continue
 
         const dist = Math.abs(l - seedL) + Math.abs(s - seedS) * 0.1 + Math.abs(sh - seedH) * 0.2
 
@@ -307,10 +312,10 @@ function deriveLink(brand, bg, fg, isLight) {
  */
 function derivePrimaryForeground(brand) {
   const candidates = [
-    { h: 210, s: 40, l: 98 },   // tinted white
+    { h: 210, s: 40, l: 98 }, // tinted white
     { h: 222.2, s: 47.4, l: 11.2 }, // tinted dark
-    { h: 0, s: 0, l: 100 },     // pure white
-    { h: 0, s: 0, l: 0 },       // pure black
+    { h: 0, s: 0, l: 100 }, // pure white
+    { h: 0, s: 0, l: 0 }, // pure black
   ]
 
   let best = candidates[0]
@@ -324,7 +329,6 @@ function derivePrimaryForeground(brand) {
   }
   return best
 }
-
 
 // ─── Output formatting ──────────────────────────────────────────────
 
@@ -347,14 +351,22 @@ function toTokenMap(obj) {
  * All bridge token names that map to shadcn variables.
  */
 export const BRIDGE_TOKENS = [
-  'background', 'foreground',
-  'muted', 'muted-foreground',
-  'secondary', 'secondary-foreground',
-  'accent', 'accent-foreground',
-  'primary', 'primary-foreground',
-  'destructive', 'destructive-foreground',
-  'border', 'ring',
-  'popover', 'popover-foreground',
+  'background',
+  'foreground',
+  'muted',
+  'muted-foreground',
+  'secondary',
+  'secondary-foreground',
+  'accent',
+  'accent-foreground',
+  'primary',
+  'primary-foreground',
+  'destructive',
+  'destructive-foreground',
+  'border',
+  'ring',
+  'popover',
+  'popover-foreground',
 ]
 
 /**
@@ -363,10 +375,15 @@ export const BRIDGE_TOKENS = [
  * When absent, the library defaults in src/index.css apply.
  */
 export const EXTENSION_TOKENS = [
-  'info', 'info-foreground',
-  'success', 'success-foreground',
-  'warning', 'warning-foreground',
-  'diff-added', 'diff-removed',
-  'highlight', 'highlight-foreground',
+  'info',
+  'info-foreground',
+  'success',
+  'success-foreground',
+  'warning',
+  'warning-foreground',
+  'diff-added',
+  'diff-removed',
+  'highlight',
+  'highlight-foreground',
   'link',
 ]

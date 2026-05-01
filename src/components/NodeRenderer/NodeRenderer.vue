@@ -4,7 +4,7 @@ import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -44,6 +44,7 @@ import {
   heightEstimationExperimentRevision,
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
+import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
@@ -117,6 +118,7 @@ const headingProbeWrapperRefs = reactive<Record<number, HTMLElement | null>>({
 const viewportPriorityAutoDisabled = ref(false)
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
+const renderAsFragment = computed(() => props.renderAsFragment === true)
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
 const attrs = useAttrs() as RendererAttrs
 const textStreamState = new Map<string, string>()
@@ -280,6 +282,7 @@ const heightExperimentConfig = computed(() => {
 })
 const heightExperimentEnabled = computed(() => Boolean(
   isClient
+  && !renderAsFragment.value
   && props.customId
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
@@ -289,6 +292,8 @@ const codeBlockEstimationEnabled = computed(() => heightExperimentEnabled.value 
 const experimentProbeWidth = computed(() => Math.max(320, experimentContainerWidth.value || containerRef.value?.clientWidth || 640))
 const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const virtualizationEnabled = computed(() => {
+  if (renderAsFragment.value)
+    return false
   if ((props.maxLiveNodes ?? 0) <= 0)
     return false
   return parsedNodes.value.length > maxLiveNodesResolved.value
@@ -330,7 +335,7 @@ const resolvedInitialBatch = computed(() => {
     return resolvedBatchSize.value
   return Math.max(0, initial)
 })
-const batchingEnabled = computed(() => props.batchRendering !== false && resolvedBatchSize.value > 0 && isClient && !isTestEnv)
+const batchingEnabled = computed(() => !renderAsFragment.value && props.batchRendering !== false && resolvedBatchSize.value > 0 && isClient && !isTestEnv)
 const renderedCount = ref(0)
 const previousRenderContext = ref<{ key: typeof props.indexKey, total: number }>({
   key: props.indexKey,
@@ -360,6 +365,8 @@ let restoreReconcileTimers: number[] = []
 let detachScrollHandler: (() => void) | null = null
 let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
 const deferNodes = computed(() => {
+  if (renderAsFragment.value)
+    return false
   if (props.deferNodesUntilVisible === false)
     return false
   // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
@@ -1936,32 +1943,186 @@ onBeforeUnmount(() => {
   cancelScheduledFocusSync()
 })
 
-const MermaidBlockNodeAsync = defineAsyncComponent(async () => {
-  try {
-    const mod = await import('../../components/MermaidBlockNode')
-    return mod.default
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
-      e,
-    )
-    return PreCodeNode
-  }
+const MermaidBlockNodeLoading = defineComponent({
+  name: 'MermaidBlockNodeLoading',
+  props: {
+    node: { type: Object, required: true },
+    showHeader: { type: Boolean, default: true },
+    estimatedPreviewHeightPx: { type: Number, default: undefined },
+  },
+  setup(loadingProps) {
+    const height = computed(() => clampMermaidPreviewHeight(
+      parsePositiveNumber(loadingProps.estimatedPreviewHeightPx)
+      ?? estimateMermaidPreviewHeight(String((loadingProps.node as RuntimeCodeBlockNode).code ?? '')),
+    ))
+    return () => h('div', {
+      'class': 'mermaid-block-container rounded-lg border overflow-hidden',
+      'style': {
+        margin: 'var(--ms-flow-diagram-y) 0',
+        borderColor: 'var(--diagram-border)',
+      },
+      'data-markstream-mermaid': '1',
+      'data-markstream-mode': 'pending',
+    }, [
+      loadingProps.showHeader
+        ? h('div', {
+            class: 'mermaid-block-header flex justify-between items-center border-b px-[var(--ms-inset-panel-x)] py-[var(--ms-inset-panel-y)]',
+            style: {
+              background: 'var(--diagram-header-bg)',
+              borderColor: 'var(--diagram-border)',
+            },
+          }, [
+            h('div', { class: 'flex items-center gap-x-2 overflow-hidden' }, [
+              h('span', {
+                class: 'mermaid-label-text text-[length:var(--ms-text-label)] font-medium font-mono truncate',
+                style: { color: 'var(--code-action-fg)' },
+              }, 'Mermaid'),
+            ]),
+            h('div', {
+              'class': 'mermaid-header-actions flex items-center gap-[var(--ms-gap-header-actions)] opacity-0 pointer-events-none',
+              'aria-hidden': 'true',
+            }, Array.from({ length: 4 }, () => h('span', {
+              class: 'mermaid-action-btn inline-flex items-center justify-center p-[var(--ms-action-btn-padding)] rounded',
+            }, [
+              h('span', { class: 'action-icon block' }),
+            ]))),
+          ])
+        : null,
+      h('div', {
+        class: 'mermaid-preview-area relative overflow-hidden block',
+        style: {
+          height: `${height.value}px`,
+          minHeight: 'var(--ms-size-diagram-min-height)',
+          background: 'var(--diagram-bg)',
+        },
+      }, [
+        h('div', {
+          class: '_mermaid w-full text-center flex items-center justify-center min-h-full',
+          style: {
+            fontFamily: 'inherit',
+            contentVisibility: 'auto',
+            contain: 'content',
+            containIntrinsicSize: 'var(--ms-size-diagram-min-height) 240px',
+          },
+        }),
+      ]),
+    ])
+  },
 })
 
-const InfographicBlockNodeAsync = defineAsyncComponent(async () => {
-  try {
-    const mod = await import('../../components/InfographicBlockNode')
-    return mod.default
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering. To enable Infographic rendering, please install "@antv/infographic".',
-      e,
-    )
-    return PreCodeNode
-  }
+const MermaidBlockNodeAsync = defineAsyncComponent({
+  loader: async () => {
+    try {
+      const mod = await import('../../components/MermaidBlockNode')
+      return mod.default
+    }
+    catch (e) {
+      console.warn(
+        '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+        e,
+      )
+      return PreCodeNode
+    }
+  },
+  loadingComponent: MermaidBlockNodeLoading,
+  delay: 0,
+})
+
+const InfographicBlockNodeLoading = defineComponent({
+  name: 'InfographicBlockNodeLoading',
+  props: {
+    node: { type: Object, required: true },
+    showHeader: { type: Boolean, default: true },
+    estimatedPreviewHeightPx: { type: Number, default: undefined },
+  },
+  setup(loadingProps) {
+    const height = computed(() => clampInfographicPreviewHeight(
+      parsePositiveNumber(loadingProps.estimatedPreviewHeightPx)
+      ?? estimateInfographicPreviewHeight(String((loadingProps.node as RuntimeCodeBlockNode).code ?? '')),
+    ))
+    return () => h('div', {
+      'class': 'infographic-block-container rounded-lg border overflow-hidden',
+      'style': {
+        margin: 'var(--ms-flow-diagram-y) 0',
+        background: 'var(--diagram-bg)',
+        borderColor: 'var(--diagram-border)',
+        color: 'hsl(var(--ms-foreground))',
+      },
+      'data-markstream-infographic': '1',
+      'data-markstream-mode': 'pending',
+    }, [
+      loadingProps.showHeader
+        ? h('div', {
+            class: 'infographic-block-header flex justify-between items-center border-b',
+            style: {
+              padding: 'var(--ms-inset-panel-y) var(--ms-inset-panel-x)',
+              background: 'var(--diagram-header-bg)',
+              borderColor: 'var(--diagram-border)',
+              minHeight: 'calc(var(--ms-action-btn-icon) + var(--ms-action-btn-padding) + var(--ms-action-btn-padding) + var(--ms-inset-panel-y) + var(--ms-inset-panel-y) + 1px)',
+            },
+          }, [
+            h('div', { class: 'flex items-center gap-x-2 overflow-hidden' }, [
+              h('span', {
+                class: 'icon-slot action-icon shrink-0',
+                style: {
+                  display: 'inline-flex',
+                  width: 'var(--ms-action-btn-icon)',
+                  height: 'var(--ms-action-btn-icon)',
+                },
+              }),
+              h('span', {
+                class: 'infographic-label font-medium font-mono truncate',
+                style: {
+                  fontSize: 'var(--ms-text-label)',
+                  color: 'hsl(var(--ms-muted-foreground))',
+                },
+              }, 'Infographic'),
+            ]),
+            h('div', {
+              'class': 'infographic-header-actions flex items-center opacity-0 pointer-events-none',
+              'style': { gap: 'var(--ms-gap-header-actions)' },
+              'aria-hidden': 'true',
+            }, Array.from({ length: 4 }, () => h('span', {
+              class: 'infographic-action-btn inline-flex items-center justify-center p-[var(--ms-action-btn-padding)] rounded',
+              style: {
+                width: 'calc(var(--ms-action-btn-icon) + var(--ms-action-btn-padding) + var(--ms-action-btn-padding))',
+                height: 'calc(var(--ms-action-btn-icon) + var(--ms-action-btn-padding) + var(--ms-action-btn-padding))',
+              },
+            }))),
+          ])
+        : null,
+      h('div', {
+        class: 'infographic-preview relative overflow-hidden block',
+        style: {
+          height: `${height.value}px`,
+          minHeight: 'var(--ms-size-diagram-min-height)',
+          background: 'var(--diagram-bg)',
+        },
+      }, [
+        h('div', { class: 'absolute inset-0' }, [
+          h('div', { class: 'w-full text-center flex items-center justify-center min-h-full' }),
+        ]),
+      ]),
+    ])
+  },
+})
+
+const InfographicBlockNodeAsync = defineAsyncComponent({
+  loader: async () => {
+    try {
+      const mod = await import('../../components/InfographicBlockNode')
+      return mod.default
+    }
+    catch (e) {
+      console.warn(
+        '[markstream-vue] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering. To enable Infographic rendering, please install "@antv/infographic".',
+        e,
+      )
+      return PreCodeNode
+    }
+  },
+  loadingComponent: InfographicBlockNodeLoading,
+  delay: 0,
 })
 
 const D2BlockNodeAsync = defineAsyncComponent(async () => {
@@ -2146,6 +2307,22 @@ const renderedItems = computed(() => {
         estimatedContentHeightPx: estimatedHeight.contentHeight,
       }
     }
+    if (node.type === 'code_block' && language === 'mermaid' && parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+      bindings = {
+        ...bindings,
+        estimatedPreviewHeightPx: clampMermaidPreviewHeight(
+          estimateMermaidPreviewHeight(String((node as RuntimeCodeBlockNode).code ?? '')),
+        ),
+      }
+    }
+    if (node.type === 'code_block' && language === 'infographic' && parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+      bindings = {
+        ...bindings,
+        estimatedPreviewHeightPx: clampInfographicPreviewHeight(
+          estimateInfographicPreviewHeight(String((node as RuntimeCodeBlockNode).code ?? '')),
+        ),
+      }
+    }
 
     return {
       ...item,
@@ -2174,6 +2351,10 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = customComponents[String(node.type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
+    const customForLanguage = lang ? customComponents[lang] : undefined
+    if (customForLanguage)
+      return customForLanguage
+
     // Keep Mermaid blocks routed to MermaidBlockNode unless a specific
     // `mermaid` override is provided.
     if (lang === 'mermaid') {
@@ -2250,10 +2431,37 @@ function handleContainerMouseout(event: MouseEvent) {
     return
   emit('mouseout', event)
 }
+
+function handleFragmentMouseover(event: MouseEvent) {
+  emit('mouseover', event)
+}
+
+function handleFragmentMouseout(event: MouseEvent) {
+  emit('mouseout', event)
+}
 </script>
 
 <template>
+  <template v-if="renderAsFragment">
+    <component
+      :is="item.component"
+      v-for="item in renderedItems"
+      :key="item.index"
+      :node="item.node"
+      :loading="item.node.loading"
+      :index-key="item.indexKey"
+      v-bind="item.bindings"
+      :custom-id="props.customId"
+      :is-dark="props.isDark"
+      @click="handleContainerClick"
+      @mouseover="handleFragmentMouseover"
+      @mouseout="handleFragmentMouseout"
+      @copy="emit('copy', $event)"
+      @handle-artifact-click="emit('handleArtifactClick', $event)"
+    />
+  </template>
   <div
+    v-else
     ref="containerRef"
     class="markstream-vue markdown-renderer"
     :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"

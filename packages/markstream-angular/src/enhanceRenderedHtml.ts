@@ -4,6 +4,7 @@ import { getKatex } from './optional/katex'
 import { getMermaid } from './optional/mermaid'
 import { getUseMonaco } from './optional/monaco'
 import { extractRenderedSvg, toSafeSvgMarkup } from './sanitizeSvg'
+import { normalizeKaTeXRenderInput } from './utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from './workers/katexWorkerClient'
 import { canParseOffthread, findPrefixOffthread } from './workers/mermaidWorkerClient'
 
@@ -241,8 +242,9 @@ async function renderKatex(root: HTMLElement, isActive: () => boolean) {
 }
 
 async function renderKatexMarkup(source: string, displayMode: boolean) {
+  const normalizedSource = normalizeKaTeXRenderInput(source)
   try {
-    return await renderKaTeXWithBackpressure(source, displayMode, {
+    return await renderKaTeXWithBackpressure(normalizedSource, displayMode, {
       timeout: 1500,
       waitTimeout: 0,
       maxRetries: 0,
@@ -260,11 +262,11 @@ async function renderKatexMarkup(source: string, displayMode: boolean) {
   if (!katex)
     throw new Error('KaTeX renderer is not available.')
 
-  const html = katex.renderToString(source, {
+  const html = katex.renderToString(normalizedSource, {
     displayMode,
     throwOnError: false,
   })
-  setKaTeXCache(source, displayMode, html)
+  setKaTeXCache(normalizedSource, displayMode, html)
   return html
 }
 

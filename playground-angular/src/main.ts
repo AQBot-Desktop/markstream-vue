@@ -1,7 +1,6 @@
 import 'katex/dist/katex.min.css'
 import './app.css'
 import './test-page.css'
-import './test-lab.css'
 import '../../packages/markstream-angular/src/index.css'
 import '@angular/compiler'
 

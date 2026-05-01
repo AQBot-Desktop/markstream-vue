@@ -40,6 +40,7 @@ import {
   coerceCustomHtmlNode,
   resolveHtmlTag,
   resolveNodeOutletCodeMode,
+  resolveNodeOutletCustomComponent,
   resolveNodeOutletCustomInputs,
 } from '../shared/node-outlet-helpers'
 import { StrikethroughNodeComponent } from '../StrikethroughNode/StrikethroughNode.component'
@@ -205,26 +206,7 @@ export class NodeOutletComponent {
   }
 
   get resolvedCustomComponent() {
-    const customComponents = this.customComponentMap
-    const direct = customComponents?.[this.resolvedType]
-    if (direct)
-      return direct
-
-    if (this.resolvedType === 'code_block') {
-      if (this.codeMode === 'mermaid' && customComponents?.mermaid)
-        return customComponents.mermaid
-      if (this.codeMode === 'd2' && customComponents?.d2)
-        return customComponents.d2
-      if (this.codeMode === 'infographic' && customComponents?.infographic)
-        return customComponents.infographic
-    }
-
-    const tag = this.htmlTag
-    // Check if there's a custom component for this tag before deciding to escape
-    if (tag && customComponents?.[tag])
-      return customComponents[tag]
-
-    return null
+    return resolveNodeOutletCustomComponent(this.node, this.context, this.customComponentMap)
   }
 
   get customNode() {

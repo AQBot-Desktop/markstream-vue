@@ -1,7 +1,9 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { NodeComponentProps } from '../../types/node-component'
 import React from 'react'
+import { getCustomNodeComponents } from '../../customComponents'
 import { BLOCK_LEVEL_TYPES, renderNodeChildren } from '../../renderers/renderChildren'
+import { isParagraphBreakingCustomHtmlNode } from '../../utils/customHtmlTag'
 
 function isWhitespaceTextNode(node: ParsedNode | null | undefined) {
   return node?.type === 'text' && String((node as any)?.content ?? '').trim() === ''
@@ -70,6 +72,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   const nodeChildren = node.children ?? []
+  const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
   const parts: React.ReactNode[] = []
   const inlineBuffer: ParsedNode[] = []
 
@@ -86,7 +89,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type)) {
+    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, customComponents, ctx.customHtmlTags)) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>

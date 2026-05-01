@@ -6,7 +6,7 @@
 
 - Monaco 模式（安装 `stream-monaco`）— 类编辑器渲染，带 worker 支持
 - 降级模式 — 未安装 `stream-monaco` 时会回退为纯 `<pre><code>` 渲染
-- 如果你希望用 Shiki（不引入 Monaco），请使用 `MarkdownCodeBlockNode`（同伴依赖：`shiki` + `stream-markdown`）
+- 如果你希望用 Shiki（不引入 Monaco），请使用 `MarkdownCodeBlockNode`（同伴依赖：`stream-markdown`）
 
 ## Props
 

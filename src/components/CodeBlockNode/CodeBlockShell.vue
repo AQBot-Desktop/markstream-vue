@@ -10,64 +10,6 @@ import { computed, ref } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 
-const moreMenuOpen = ref(false)
-const moreMenuRef = ref<HTMLElement | null>(null)
-const moreBtnRef = ref<HTMLElement | null>(null)
-const menuStyle = ref<Record<string, string>>({})
-
-function toggleMoreMenu() {
-  moreMenuOpen.value = !moreMenuOpen.value
-  if (moreMenuOpen.value) {
-    updateMenuPosition()
-    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
-  }
-}
-
-// CSS variables to forward from source context to teleported menu
-const MENU_CSS_VARS = [
-  '--ms-popover', '--ms-popover-foreground',
-  '--code-border', '--code-action-fg',
-  '--code-action-hover-bg', '--code-action-hover-fg',
-  '--ms-shadow-popover', '--ms-duration-fast', '--ms-ease-standard',
-  '--ms-radius',
-]
-
-function updateMenuPosition() {
-  const btn = moreBtnRef.value
-  if (!btn) return
-  const rect = btn.getBoundingClientRect()
-  // Read computed CSS vars from source context and forward to teleported menu
-  const computed = getComputedStyle(btn)
-  const vars: Record<string, string> = {
-    position: 'absolute',
-    top: `${rect.bottom + window.scrollY + 4}px`,
-    right: `${document.body.scrollWidth - rect.right - window.scrollX}px`,
-    zIndex: '9999',
-  }
-  for (const v of MENU_CSS_VARS) {
-    const val = computed.getPropertyValue(v).trim()
-    if (val) vars[v] = val
-  }
-  menuStyle.value = vars
-}
-
-function closeMoreMenuOutside(e: Event) {
-  const target = e.target as Node
-  if (moreMenuRef.value?.contains(target) || moreBtnRef.value?.contains(target)) {
-    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
-  }
-  else {
-    moreMenuOpen.value = false
-  }
-}
-
-// Whether the overflow menu has any items to show
-const hasOverflowItems = computed(() =>
-  (props.showFontSizeButtons && props.enableFontSizeControl)
-  || props.showExpandButton
-  || (props.isPreviewable && props.showPreviewButton),
-)
-
 const props = withDefaults(defineProps<{
   // Header visibility
   showHeader?: boolean
@@ -113,7 +55,6 @@ const props = withDefaults(defineProps<{
   showFontSizeButtons: true,
   fontBaselineReady: false,
 })
-
 const emit = defineEmits<{
   (e: 'toggleCollapse'): void
   (e: 'decreaseFont'): void
@@ -123,17 +64,46 @@ const emit = defineEmits<{
   (e: 'toggleExpand', event: MouseEvent): void
   (e: 'preview'): void
 }>()
+const moreMenuOpen = ref(false)
+const moreMenuRef = ref<HTMLElement | null>(null)
+const moreBtnRef = ref<HTMLElement | null>(null)
+
+function toggleMoreMenu() {
+  moreMenuOpen.value = !moreMenuOpen.value
+  if (moreMenuOpen.value) {
+    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
+  }
+}
+
+function closeMoreMenuOutside(e: Event) {
+  const target = e.target as Node
+  if (moreMenuRef.value?.contains(target) || moreBtnRef.value?.contains(target)) {
+    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
+  }
+  else {
+    moreMenuOpen.value = false
+  }
+}
+
+// Whether the overflow menu has any items to show
+const hasOverflowItems = computed(() =>
+  (props.showFontSizeButtons && props.enableFontSizeControl)
+  || props.showExpandButton
+  || (props.isPreviewable && props.showPreviewButton),
+)
 
 const { t } = useSafeI18n()
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 function onBtnHover(e: MouseEvent | FocusEvent, text: string) {
-  if (!tooltipsEnabled.value) return
+  if (!tooltipsEnabled.value)
+    return
   showTooltipForAnchor(e.currentTarget as HTMLElement, text, 'top', false, undefined, props.isDark)
 }
 
 function onBtnLeave() {
-  if (!tooltipsEnabled.value) return
+  if (!tooltipsEnabled.value)
+    return
   hideTooltip()
 }
 
@@ -222,9 +192,8 @@ const fontIncreaseDisabled = computed(() =>
             <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="currentColor"><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></g></svg>
           </button>
 
-          <Teleport to="body">
-            <Transition name="code-menu">
-              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] shadow-[var(--ms-shadow-popover)]" style="border-radius: var(--ms-radius)" role="menu">
+          <Transition name="code-menu">
+            <div v-if="moreMenuOpen" ref="moreMenuRef" class="code-more-menu min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] shadow-[var(--ms-shadow-popover)]" role="menu">
               <!-- Font size controls -->
               <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontDecreaseDisabled" @click="emit('decreaseFont')">
@@ -253,9 +222,8 @@ const fontIncreaseDisabled = computed(() =>
                 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
                 <span>{{ t('common.preview') || 'Preview' }}</span>
               </button>
-              </div>
-            </Transition>
-          </Teleport>
+            </div>
+          </Transition>
         </div>
       </div>
     </slot>
@@ -295,9 +263,7 @@ const fontIncreaseDisabled = computed(() =>
 /* ── Container base (shared by all code block variants) ── */
 .code-block-container {
   margin: var(--ms-flow-codeblock-y) 0;
-  contain: content;
-  content-visibility: auto;
-  contain-intrinsic-size: 320px var(--ms-size-skeleton-min-height);
+  contain: layout style;
   container-type: inline-size;
   background: var(--code-bg);
   border-color: var(--code-border);
@@ -307,7 +273,11 @@ const fontIncreaseDisabled = computed(() =>
 
 /* ── Header layout ── */
 .code-block-header {
+  position: relative;
+  z-index: 1;
   gap: var(--ms-gap-header);
+  border-radius: var(--ms-radius) var(--ms-radius) 0 0;
+  overflow: visible;
 }
 
 .code-block-header .code-header-main {
@@ -391,6 +361,24 @@ const fontIncreaseDisabled = computed(() =>
 .code-diff-stat.added {
   color: var(--diff-added-fg);
   background: hsl(var(--ms-diff-added) / 0.1);
+}
+
+/* ── Dropdown menu ── */
+.code-more-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  z-index: 50;
+  border-radius: var(--ms-radius);
+}
+
+/* ── Content / loading — clip to bottom border-radius ── */
+.code-block-shell-content,
+.code-loading-placeholder {
+  overflow: hidden;
+  border-radius: 0 0 var(--ms-radius) var(--ms-radius);
+  contain: content;
 }
 
 /* ── Menu transition ── */

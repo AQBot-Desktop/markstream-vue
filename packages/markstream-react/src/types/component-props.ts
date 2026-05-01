@@ -191,6 +191,7 @@ export interface MermaidBlockActionContext {
 export interface MermaidBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   workerTimeoutMs?: number
@@ -284,6 +285,7 @@ export interface InfographicBlockActionContext {
 export interface InfographicBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   showHeader?: boolean

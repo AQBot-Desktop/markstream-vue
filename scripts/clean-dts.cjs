@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const process = require('node:process')
 
 const distDir = path.resolve(__dirname, '..', 'dist')
 const typesDir = path.join(distDir, 'types')

@@ -5,6 +5,7 @@ import afterBasicSource from '../../../test/fixtures/react-markdown-migration-de
 import beforeAdvancedSource from '../../../test/fixtures/react-markdown-migration-demo/before-advanced.tsx?raw'
 import beforeBasicSource from '../../../test/fixtures/react-markdown-migration-demo/before-basic.tsx?raw'
 import skillOutputSource from '../../../test/fixtures/react-markdown-migration-demo/skill-output.md?raw'
+import { PLAYGROUND_CUSTOM_HTML_TAGS, PLAYGROUND_CUSTOM_ID } from './markstreamPlayground'
 
 interface MigrationDemoPageProps {
   isDark: boolean
@@ -144,6 +145,8 @@ export function MigrationDemoPage({ isDark, onGoHome, onGoTest }: MigrationDemoP
                 <NodeRenderer
                   content={skillOutputSource}
                   isDark={isDark}
+                  customId={PLAYGROUND_CUSTOM_ID}
+                  customHtmlTags={PLAYGROUND_CUSTOM_HTML_TAGS}
                   renderCodeBlocksAsPre
                   viewportPriority={false}
                   deferNodesUntilVisible={false}

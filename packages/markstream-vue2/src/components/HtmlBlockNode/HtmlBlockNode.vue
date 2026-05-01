@@ -1,37 +1,29 @@
 <script setup lang="ts">
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue-demi'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
+import { renderMarkdownNodesToHtml } from '../../utils/nestedHtml'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 
 const props = defineProps<{
   node: {
     content: string
+    raw?: string
+    tag?: string
     attrs?: [string, string][] | null
+    children?: any[]
     loading?: boolean
   }
   customId?: string
 }>()
 
-// The parser produces attrs as an array of [key, value] tuples.
-// Vue's `v-bind` expects an object (or array of objects). Convert safely.
 const boundAttrs = computed(() => {
-  const a = props.node.attrs
-  if (!a)
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs)
+  if (!sanitizedAttrs)
     return undefined
-  if (Array.isArray(a)) {
-    // Convert tuple array to object; guard against malformed entries.
-    const obj: Record<string, string> = {}
-    for (const tuple of a) {
-      if (!tuple || tuple.length < 2)
-        continue
-      const [k, v] = tuple
-      if (k != null)
-        obj[String(k)] = v == null ? '' : String(v)
-    }
-    return obj
-  }
-  return a
+  const record = tokenAttrsToRecord(sanitizedAttrs)
+  return Object.keys(record).length > 0 ? record : undefined
 })
 
 // Get custom components from global registry
@@ -58,15 +50,27 @@ const DynamicRenderer = defineComponent({
   },
 })
 
+const structuredChildren = computed(() => Array.isArray(props.node.children) ? props.node.children : [])
+const structuredTag = computed(() => String(props.node.tag || 'div'))
+const isBlockedStructuredTag = computed(() => NON_STRUCTURING_HTML_TAGS.has(structuredTag.value.trim().toLowerCase()))
+const structuredHtml = computed(() => {
+  if (structuredChildren.value.length === 0 || !props.node.tag || isBlockedStructuredTag.value)
+    return ''
+  return renderMarkdownNodesToHtml(structuredChildren.value as any)
+})
+
 // Computed property to determine render mode and content
 const renderMode = computed(() => {
+  if (structuredChildren.value.length > 0 && !!props.node.tag && !isBlockedStructuredTag.value)
+    return { mode: 'structured' as const }
+
   const content = props.node.content
   if (!content)
     return { mode: 'html', content: '' }
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content }
+    return { mode: 'html', content: sanitizeHtmlContent(content) }
 
   return { mode: 'dynamic', content }
 })
@@ -123,12 +127,41 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="htmlRef" class="html-block-node" v-bind="boundAttrs">
+  <!-- eslint-disable vue/no-v-text-v-html-on-component -->
+  <component
+    :is="structuredTag"
+    v-if="renderMode.mode === 'structured' && shouldRender"
+    ref="htmlRef"
+    class="html-block-node"
+    v-bind="boundAttrs"
+    v-html="structuredHtml"
+  />
+  <!-- eslint-enable vue/no-v-text-v-html-on-component -->
+  <component
+    :is="structuredTag"
+    v-else-if="renderMode.mode === 'structured'"
+    ref="htmlRef"
+    class="html-block-node"
+    v-bind="boundAttrs"
+  >
+    <div class="html-block-node__placeholder">
+      <slot name="placeholder" :node="node">
+        <span class="html-block-node__placeholder-bar" />
+        <span class="html-block-node__placeholder-bar w-4/5" />
+        <span class="html-block-node__placeholder-bar w-2/3" />
+      </slot>
+    </div>
+  </component>
+  <div
+    v-else
+    ref="htmlRef"
+    class="html-block-node"
+  >
     <template v-if="shouldRender">
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :content="renderMode.content" :custom-components="customComponents" />
       <!-- Fallback to v-html for standard HTML -->
-      <div v-else v-html="renderContent" />
+      <div v-else v-bind="boundAttrs" v-html="renderMode.content" />
     </template>
     <div v-else class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">

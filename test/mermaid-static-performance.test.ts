@@ -15,6 +15,48 @@ afterEach(() => {
 })
 
 describe('mermaid static render performance', () => {
+  it('starts completed diagrams in preview mode with a reserved preview height', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 100 100"><g /></svg>',
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        estimatedPreviewHeightPx: 500,
+      },
+    })
+
+    expect(wrapper.find('[data-markstream-mermaid="1"]').attributes('data-markstream-mode')).toBe('pending')
+    expect(wrapper.find('.mermaid-source-panel').exists()).toBe(false)
+    expect((wrapper.get('.mermaid-preview-area').element as HTMLElement).style.height).toBe('500px')
+
+    wrapper.unmount()
+  })
+
   it('renders completed diagrams once without starting preview polling', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
@@ -36,6 +78,7 @@ describe('mermaid static render performance', () => {
     }))
     vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
       getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
     }))
 
     const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default

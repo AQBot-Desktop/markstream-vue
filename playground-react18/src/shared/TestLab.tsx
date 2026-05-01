@@ -1,11 +1,14 @@
+import type { ClipboardEvent as ReactClipboardEvent } from 'react'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import type { TestPageViewMode } from '../../../playground-shared/testPageState'
 import type { StreamPresetId } from './streamPresets'
 import type { StreamSliceMode, StreamTransportMode } from './useStreamSimulator'
 import { NodeRenderer } from 'markstream-react'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { resolveMarkdownTextareaPaste } from '../../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode } from '../../../playground-shared/testPageState'
+import { PLAYGROUND_CUSTOM_HTML_TAGS, PLAYGROUND_CUSTOM_ID } from './markstreamPlayground'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './useStreamSimulator'
 
@@ -185,6 +188,20 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
     resetStreamState()
     setInput('')
     setIsPreviewShareCopied(false)
+  }
+
+  function handleEditorPaste(event: ReactClipboardEvent<HTMLTextAreaElement>) {
+    const textarea = event.currentTarget
+    const pasted = event.clipboardData.getData('text/plain')
+    const next = resolveMarkdownTextareaPaste(textarea, pasted)
+    if (!next)
+      return
+
+    event.preventDefault()
+    textarea.value = next.nextValue
+    textarea.selectionStart = next.selectionStart
+    textarea.selectionEnd = next.selectionEnd
+    setInput(next.nextValue)
   }
 
   function handleStreamPresetChange(presetId: StreamPresetId) {
@@ -468,6 +485,7 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
                 <textarea
                   value={input}
                   onChange={event => setInput(event.target.value)}
+                  onPaste={handleEditorPaste}
                   className="editor-textarea"
                   spellCheck={false}
                   placeholder="Paste markdown here..."
@@ -533,6 +551,8 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
                   typewriter={false}
                   codeBlockStream
                   isDark={isDark}
+                  customId={PLAYGROUND_CUSTOM_ID}
+                  customHtmlTags={PLAYGROUND_CUSTOM_HTML_TAGS}
                   codeBlockDarkTheme="vitesse-dark"
                   codeBlockLightTheme="vitesse-light"
                 />

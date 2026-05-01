@@ -168,6 +168,7 @@
 - 步骤：
   - 安装 `stream-monaco` peer
   - 确认 Monaco workers 已正确打包（Vite plugin），并确保只在浏览器端执行
+  - 如果应用层要提前预热，调用 `markstream-vue` 的 `preloadCodeBlockRuntime()`；不要为了预热 worker 直接 import `stream-monaco`
 - 最小追问： “控制台是否有 worker/Monaco 报错？生产环境是否已打包 Monaco workers？”
 - 文档：`docs/guide/monaco.md`, `docs/guide/components.md`
 
@@ -176,7 +177,7 @@
 - 表述： “SSR 友好”, “减包体”
 - 步骤：
   - 用 `MarkdownCodeBlockNode`（Shiki）或开启 `render-code-blocks-as-pre`
-  - 如果用 Shiki：安装 `shiki` + `stream-markdown`
+  - 如果用 Shiki：安装 `stream-markdown`
 - 最小追问： “需要语法高亮还是纯文本就行？”
 - 文档：`docs/guide/code-blocks.md`, `docs/guide/components.md`
 

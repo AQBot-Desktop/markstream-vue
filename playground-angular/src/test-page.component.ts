@@ -17,6 +17,7 @@ import {
   MarkstreamAngularComponent,
   PreCodeNode,
 } from 'markstream-angular'
+import { resolveMarkdownTextareaPaste } from '../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../playground-shared/testLabFixtures'
 import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withMarkdownHash } from '../../playground-shared/testPageState'
 import {
@@ -272,7 +273,148 @@ function basePageUrl() {
               </div>
           </section>
 
-          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--sandbox">
+          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--share">
+              <div class="panel-card__head">
+                <div>
+                  <h2>分享与排障</h2>
+                  <p>把当前输入直接带给别人复现。</p>
+                </div>
+              </div>
+
+              <div class="share-actions">
+                <button type="button" class="action-button action-button--primary" [disabled]="isWorking()" (click)="generateAndCopy()">
+                  {{ isCopied() ? '已复制分享链接' : (isWorking() ? '生成中...' : '复制分享链接') }}
+                </button>
+                <button type="button" class="action-button" (click)="copyRawInput()">
+                  复制 Issue 链接
+                </button>
+                <button type="button" class="action-button" (click)="openIssueInNewTab()">
+                  打开 Issue
+                </button>
+              </div>
+
+              <div class="meta-list">
+                <div class="meta-list__row">
+                  <span>当前视图</span>
+                  <strong>{{ renderModeLabel() }}</strong>
+                </div>
+                <div class="meta-list__row">
+                  <span>分享地址</span>
+                  <strong>{{ shareUrl() || '尚未生成' }}</strong>
+                </div>
+              </div>
+
+              <div *ngIf="tooLong()" class="info-banner info-banner--warning">
+                当前内容过长，建议使用 Issue 链接分享完整输入。
+              </div>
+              <div *ngIf="notice()" class="info-banner" [class.info-banner--success]="noticeType() === 'success'" [class.info-banner--error]="noticeType() === 'error'" [class.info-banner--info]="noticeType() === 'info'">
+                {{ notice() }}
+              </div>
+          </section>
+
+          <section class="workspace-grid" [class.workspace-grid--share-preview]="isSharePreviewMode()">
+            <article *ngIf="!isSharePreviewMode()" class="workspace-card workspace-card--pane workspace-card--editor">
+              <header class="workspace-card__head">
+                <div>
+                  <h2>Markdown 输入</h2>
+                  <p>左侧编辑，右侧马上验证渲染结果。</p>
+                </div>
+                <span class="mini-pill">Live editor</span>
+              </header>
+
+              <textarea
+                class="editor-textarea"
+                spellcheck="false"
+                placeholder="在这里粘贴你的复现 markdown..."
+                [value]="input()"
+                (input)="updateInput($event)"
+                (paste)="handleEditorPaste($event)"
+              ></textarea>
+
+              <footer class="workspace-card__foot">
+                <span>可直接粘贴 issue 复现内容</span>
+                <span>{{ charCount() }} chars</span>
+              </footer>
+            </article>
+
+            <article
+              #previewCardRef
+              class="workspace-card workspace-card--pane workspace-card--preview"
+              [class.workspace-card--share-preview]="isSharePreviewMode()"
+            >
+              <div *ngIf="showImmersivePreviewControls()" class="preview-immersive-shell">
+                <div class="preview-immersive-toolbar">
+                  <button type="button" class="ghost-button preview-immersive-toolbar__button" (click)="returnToEditableTestPage()">
+                    {{ immersiveBackLabel() }}
+                  </button>
+                  <button type="button" class="ghost-button preview-immersive-toolbar__button" (click)="toggleAppearance()">
+                    {{ previewThemeButtonLabel() }}
+                  </button>
+                  <button
+                    *ngIf="!isSharePreviewMode()"
+                    type="button"
+                    class="ghost-button preview-immersive-toolbar__button"
+                    (click)="togglePreviewFullscreen()"
+                  >
+                    {{ isPreviewFullscreen() ? '退出全屏' : '全屏预览' }}
+                  </button>
+                </div>
+              </div>
+
+              <header *ngIf="!isSharePreviewMode()" class="workspace-card__head">
+                <div>
+                  <h2>实时预览</h2>
+                  <p>
+                    {{
+                      (isStreaming() ? 'Streaming 中' : '已显示完整输入')
+                      + (isPreviewFullscreen() ? ' · 按 Esc 退出全屏' : '')
+                    }}
+                  </p>
+                </div>
+                <div class="workspace-card__head-actions">
+                  <button type="button" class="ghost-button" (click)="toggleAppearance()">
+                    {{ previewThemeButtonLabel() }}
+                  </button>
+                  <button type="button" class="ghost-button" (click)="generateAndCopyPreview()">
+                    {{ previewShareCopied() ? '已复制预览链接' : '复制预览链接' }}
+                  </button>
+                  <button type="button" class="ghost-button" (click)="togglePreviewFullscreen()">
+                    {{ isPreviewFullscreen() ? '退出全屏' : '全屏预览' }}
+                  </button>
+                  <span class="mini-pill" [class.mini-pill--active]="isStreaming()">
+                    {{ streamStatusLabel() }}
+                  </span>
+                </div>
+              </header>
+
+              <div class="preview-surface">
+                <markstream-angular
+                  [content]="previewContent()"
+                  [final]="!isStreaming()"
+                  [isDark]="isDark()"
+                  [codeBlockDarkTheme]="'vitesse-dark'"
+                  [codeBlockLightTheme]="'vitesse-light'"
+                  [viewportPriority]="viewportPriority()"
+                  [batchRendering]="batchRendering()"
+                  [typewriter]="typewriter()"
+                  [codeBlockStream]="codeBlockStream()"
+                  [renderCodeBlocksAsPre]="renderMode() === 'pre'"
+                  [codeBlockMonacoOptions]="testPageMonacoOptions"
+                  [parseOptions]="parseOptions()"
+                  [customHtmlTags]="thinkingTags"
+                  [customComponents]="customComponents()"
+                />
+              </div>
+
+              <footer *ngIf="!isSharePreviewMode()" class="workspace-card__foot">
+                <span>{{ previewContent().length }} / {{ input().length || 0 }}</span>
+                <span>{{ isStreaming() ? renderModeLabel() + ' · Streaming 中' : 'Angular renderer' }}</span>
+              </footer>
+            </article>
+          </section>
+
+          <section *ngIf="!isSharePreviewMode()" class="sandbox-grid">
+            <section class="panel-card panel-card--sandbox">
               <div class="panel-card__head">
                 <div>
                   <h2>版本沙箱</h2>
@@ -368,147 +510,9 @@ function basePageUrl() {
               <div *ngIf="sandboxDirty()" class="info-banner info-banner--warning">
                 右侧 iframe 还没同步最新输入，点“刷新沙箱”即可用当前 markdown 重载。
               </div>
-          </section>
+            </section>
 
-          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--share">
-              <div class="panel-card__head">
-                <div>
-                  <h2>分享与排障</h2>
-                  <p>把当前输入直接带给别人复现。</p>
-                </div>
-              </div>
-
-              <div class="share-actions">
-                <button type="button" class="action-button action-button--primary" [disabled]="isWorking()" (click)="generateAndCopy()">
-                  {{ isCopied() ? '已复制分享链接' : (isWorking() ? '生成中...' : '复制分享链接') }}
-                </button>
-                <button type="button" class="action-button" (click)="copyRawInput()">
-                  复制 Issue 链接
-                </button>
-                <button type="button" class="action-button" (click)="openIssueInNewTab()">
-                  打开 Issue
-                </button>
-              </div>
-
-              <div class="meta-list">
-                <div class="meta-list__row">
-                  <span>当前视图</span>
-                  <strong>{{ renderModeLabel() }}</strong>
-                </div>
-                <div class="meta-list__row">
-                  <span>分享地址</span>
-                  <strong>{{ shareUrl() || '尚未生成' }}</strong>
-                </div>
-              </div>
-
-              <div *ngIf="tooLong()" class="info-banner info-banner--warning">
-                当前内容过长，建议使用 Issue 链接分享完整输入。
-              </div>
-              <div *ngIf="notice()" class="info-banner" [class.info-banner--success]="noticeType() === 'success'" [class.info-banner--error]="noticeType() === 'error'" [class.info-banner--info]="noticeType() === 'info'">
-                {{ notice() }}
-              </div>
-          </section>
-
-          <section class="workspace-grid" [class.workspace-grid--share-preview]="isSharePreviewMode()">
-            <article *ngIf="!isSharePreviewMode()" class="workspace-card workspace-card--pane workspace-card--editor">
-              <header class="workspace-card__head">
-                <div>
-                  <h2>Markdown 输入</h2>
-                  <p>左侧编辑，右侧马上验证渲染结果。</p>
-                </div>
-                <span class="mini-pill">Live editor</span>
-              </header>
-
-              <textarea
-                class="editor-textarea"
-                spellcheck="false"
-                placeholder="在这里粘贴你的复现 markdown..."
-                [value]="input()"
-                (input)="updateInput($event)"
-              ></textarea>
-
-              <footer class="workspace-card__foot">
-                <span>可直接粘贴 issue 复现内容</span>
-                <span>{{ charCount() }} chars</span>
-              </footer>
-            </article>
-
-            <article
-              #previewCardRef
-              class="workspace-card workspace-card--pane workspace-card--preview"
-              [class.workspace-card--share-preview]="isSharePreviewMode()"
-            >
-              <div *ngIf="showImmersivePreviewControls()" class="preview-immersive-shell">
-                <div class="preview-immersive-toolbar">
-                  <button type="button" class="ghost-button preview-immersive-toolbar__button" (click)="returnToEditableTestPage()">
-                    {{ immersiveBackLabel() }}
-                  </button>
-                  <button type="button" class="ghost-button preview-immersive-toolbar__button" (click)="toggleAppearance()">
-                    {{ previewThemeButtonLabel() }}
-                  </button>
-                  <button
-                    *ngIf="!isSharePreviewMode()"
-                    type="button"
-                    class="ghost-button preview-immersive-toolbar__button"
-                    (click)="togglePreviewFullscreen()"
-                  >
-                    {{ isPreviewFullscreen() ? '退出全屏' : '全屏预览' }}
-                  </button>
-                </div>
-              </div>
-
-              <header *ngIf="!isSharePreviewMode()" class="workspace-card__head">
-                <div>
-                  <h2>实时预览</h2>
-                  <p>
-                    {{
-                      (isStreaming() ? 'Streaming 中' : '已显示完整输入')
-                      + (isPreviewFullscreen() ? ' · 按 Esc 退出全屏' : '')
-                    }}
-                  </p>
-                </div>
-                <div class="workspace-card__head-actions">
-                  <button type="button" class="ghost-button" (click)="toggleAppearance()">
-                    {{ previewThemeButtonLabel() }}
-                  </button>
-                  <button type="button" class="ghost-button" (click)="generateAndCopyPreview()">
-                    {{ previewShareCopied() ? '已复制预览链接' : '复制预览链接' }}
-                  </button>
-                  <button type="button" class="ghost-button" (click)="togglePreviewFullscreen()">
-                    {{ isPreviewFullscreen() ? '退出全屏' : '全屏预览' }}
-                  </button>
-                  <span class="mini-pill" [class.mini-pill--active]="isStreaming()">
-                    {{ streamStatusLabel() }}
-                  </span>
-                </div>
-              </header>
-
-              <div class="preview-surface">
-                <markstream-angular
-                  [content]="previewContent()"
-                  [final]="!isStreaming()"
-                  [isDark]="isDark()"
-                  [codeBlockDarkTheme]="'vitesse-dark'"
-                  [codeBlockLightTheme]="'vitesse-light'"
-                  [viewportPriority]="viewportPriority()"
-                  [batchRendering]="batchRendering()"
-                  [typewriter]="typewriter()"
-                  [codeBlockStream]="codeBlockStream()"
-                  [renderCodeBlocksAsPre]="renderMode() === 'pre'"
-                  [codeBlockMonacoOptions]="testPageMonacoOptions"
-                  [parseOptions]="parseOptions()"
-                  [customHtmlTags]="thinkingTags"
-                  [customComponents]="customComponents()"
-                />
-              </div>
-
-              <footer *ngIf="!isSharePreviewMode()" class="workspace-card__foot">
-                <span>{{ previewContent().length }} / {{ input().length || 0 }}</span>
-                <span>{{ isStreaming() ? renderModeLabel() + ' · Streaming 中' : 'Angular renderer' }}</span>
-              </footer>
-            </article>
-
-            <article *ngIf="!isSharePreviewMode()" class="workspace-card workspace-card--full workspace-card--sandbox-preview">
+            <article class="workspace-card workspace-card--full workspace-card--sandbox-preview">
               <header class="workspace-card__head">
                 <div>
                   <h2>版本沙箱预览</h2>
@@ -820,6 +824,25 @@ export class TestPageComponent implements OnInit, OnDestroy {
   updateInput(event: Event) {
     this.stopStreamRender()
     this.input.set(readTextInput(event, this.input()))
+    this.handleInputMutation()
+  }
+
+  handleEditorPaste(event: ClipboardEvent) {
+    const textarea = event.currentTarget
+    if (!(textarea instanceof HTMLTextAreaElement))
+      return
+
+    const pasted = event.clipboardData?.getData('text/plain') ?? ''
+    const next = resolveMarkdownTextareaPaste(textarea, pasted)
+    if (!next)
+      return
+
+    event.preventDefault()
+    textarea.value = next.nextValue
+    textarea.selectionStart = next.selectionStart
+    textarea.selectionEnd = next.selectionEnd
+    this.stopStreamRender()
+    this.input.set(next.nextValue)
     this.handleInputMutation()
   }
 

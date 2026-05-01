@@ -7,6 +7,7 @@
 - `isDark?: boolean` — dark mode flag
 - `loading?: boolean` — initial loading placeholder
 - `maxHeight?: string | null` — maximum height
+- `estimatedPreviewHeightPx?: number` — first-preview height reserved before Mermaid finishes rendering; `MarkdownRender` fills this automatically for Mermaid fences
 - `isStrict?: boolean` — run Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening; use this when rendering untrusted diagrams to strip inline scripts/`javascript:` URLs that could otherwise leak into the SVG
 - `onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void` — custom error handler called when mermaid rendering fails. Return `true` to prevent the default error display. Receives the error, the raw mermaid source code, and the container DOM element so you can render custom content.
 - Header / control props (all optional, default `true`):

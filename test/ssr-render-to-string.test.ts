@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createSSRApp, defineComponent, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { disableD2, enableD2 } from '../src/components/D2BlockNode/d2'
+import HtmlBlockNode from '../src/components/HtmlBlockNode/HtmlBlockNode.vue'
 import { setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
 import MarkdownCodeBlockNode from '../src/components/MarkdownCodeBlockNode'
 import MathBlockNode from '../src/components/MathBlockNode'
@@ -125,6 +126,71 @@ Footnotes are server-rendered.[^1]
     expect(html).toContain('src="/vue-markdown-icon.svg"')
     expect(html).not.toContain('<figure')
     expect(html).toContain('Footnote body')
+  })
+
+  it('renders structured html wrappers on the server without duplicating nested markdown', async () => {
+    const html = await renderMarkdown(`<span style="font-size: 12px;">
+
+- alpha
+- beta
+
+</span>`)
+
+    expect(html).toContain('<span')
+    expect(html).toContain('font-size:12px;')
+    expect(html).toContain('<ul')
+    expect(html.match(/alpha/g)?.length ?? 0).toBe(1)
+    expect(html.match(/beta/g)?.length ?? 0).toBe(1)
+  })
+
+  it('renders nested structured html wrappers on the server', async () => {
+    const html = await renderMarkdown(`<div>
+<div>
+
+- alpha
+
+</div>
+</div>`)
+
+    expect(html.match(/<ul/g)?.length ?? 0).toBe(1)
+    expect(html.match(/alpha/g)?.length ?? 0).toBe(1)
+  })
+
+  it('renders structured details html blocks without wrapper nodes before summary', async () => {
+    const html = await renderComponent(HtmlBlockNode, {
+      node: {
+        type: 'html_block',
+        tag: 'details',
+        content: '<details open><summary>展开看一段 HTML</summary><p>body</p></details>',
+        attrs: [['open', '']],
+        children: [
+          {
+            type: 'html_block',
+            tag: 'summary',
+            content: '<summary>展开看一段 HTML</summary>',
+            children: [
+              {
+                type: 'paragraph',
+                raw: '展开看一段 HTML',
+                children: [{ type: 'text', content: '展开看一段 HTML', raw: '展开看一段 HTML' }],
+              },
+            ],
+          },
+          {
+            type: 'paragraph',
+            raw: 'body',
+            children: [{ type: 'text', content: 'body', raw: 'body' }],
+          },
+        ],
+      },
+    })
+
+    expect(html).toMatch(/<details[^>]*class="html-block-node"[^>]*>(?:<!--\[-->|<!--\]-->)*<summary[^>]*>/)
+    expect(html).not.toContain('class="markstream-vue markdown-renderer"')
+    expect(html).not.toContain('node-slot')
+    expect(html).not.toContain('data-node-index=')
+    expect(html).not.toContain('<template>')
+    expect(html).toMatch(/<p dir="auto" class="paragraph-node"[^>]*>.*?<span[^>]*><span[^>]*>body<\/span>/)
   })
 
   it('renders an explicit SSR matrix for the lighter built-in node components', async () => {

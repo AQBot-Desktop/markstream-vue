@@ -24,14 +24,17 @@ pnpm add stream-monaco
 
 ## Packaging notes
 - The library lazy-loads Monaco only when a `CodeBlockNode` mounts. This reduces initial bundle size and avoids SSR failures.
+- If the host app wants to warm Monaco earlier, call markstream-vue's `preloadCodeBlockRuntime()` instead of importing `stream-monaco` directly. This keeps markstream-vue's code block runtime readiness in sync with the worker preload.
 
 ## Troubleshooting
 - If you see `Failed to load Monaco worker`, check that the worker files are present in `dist` and accessible by the built site. The plugin's `customDistPath` can help relocate them.
 
-Quick try — preload Monaco at app startup so editor mounts faster:
+Quick try — preload the code block runtime at app startup so editor mounts faster and warm remounts skip the loading fallback:
 
 ```ts
-import { getUseMonaco } from 'markstream-vue'
+import { preloadCodeBlockRuntime } from 'markstream-vue'
 
-getUseMonaco()
+void preloadCodeBlockRuntime()
 ```
+
+`getUseMonaco()` remains supported for existing integrations and has the same runtime-ready side effect.

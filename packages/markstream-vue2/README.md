@@ -178,6 +178,23 @@ Notes:
 - Use kebab-case in templates: `mermaid-props`, `d2-props`, `infographic-props`.
 - These props are forwarded to the built-in Mermaid / D2 / Infographic blocks and to custom `mermaid` / `d2` / `infographic` overrides registered with `setCustomComponents(...)`.
 
+## Language-specific code block overrides
+
+You can also register a renderer for one fenced language directly:
+
+```ts
+import { setCustomComponents } from 'markstream-vue2'
+
+setCustomComponents('docs', {
+  echarts: EChartsBlockNode,
+})
+```
+
+Notes:
+- `echarts` only catches fences whose language is `echarts`.
+- Code block routing priority is exact language key -> built-in `mermaid` / `d2` / `infographic` routes -> `code_block`.
+- `mermaid`, `d2`, and `infographic` overrides keep their specialized prop forwarding; other language keys receive the normal code-block-level bindings.
+
 ## Mermaid tuning
 
 Common `mermaid-props` keys for streaming scenarios:

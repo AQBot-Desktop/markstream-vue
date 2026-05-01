@@ -87,4 +87,6 @@ export interface NodeRendererProps {
   maxLiveNodes?: number
   /** Number of nodes to keep before/after focus. Default: 60 */
   liveNodeBuffer?: number
+  /** Internal: render nodes as a fragment without container wrappers */
+  renderAsFragment?: boolean
 }

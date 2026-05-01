@@ -37,7 +37,6 @@ defineEmits<{
 
 const itemNode = computed(() => props.node ?? props.item)
 
-
 const liValueAttr = computed(() =>
   props.value == null ? {} : { value: props.value },
 )
@@ -70,7 +69,6 @@ ol > .list-item::marker{
 ul > .list-item::marker{
   color: var(--list-marker)
 }
-
 
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */
 .list-item :deep(.markdown-renderer) {

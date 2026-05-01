@@ -11,6 +11,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
+import { HtmlBlockNode } from '../packages/markstream-react/src/components/HtmlBlockNode/HtmlBlockNode'
+import { HtmlInlineNode } from '../packages/markstream-react/src/components/HtmlInlineNode/HtmlInlineNode'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 
@@ -101,6 +103,111 @@ describe('react: non-whitelisted custom HTML tags', () => {
     expect(html).toContain('<div')
     expect(html).toContain('</div>')
     expect(html).toContain('Content')
+
+    root.unmount()
+  })
+
+  it('sanitizes raw html fallback content for client html nodes', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const blockNode = React.createElement(HtmlBlockNode as any, {
+      node: {
+        type: 'html_block',
+        content: '<div><img src="x" onerror="alert(1)"><a href="javascript:alert(1)" title="ok">Link</a><script>alert(1)</script></div>',
+        loading: false,
+      },
+      customId: 'react-safe-html-block',
+    })
+    const inlineNode = React.createElement(HtmlInlineNode as any, {
+      node: {
+        type: 'html_inline',
+        content: 'Before <img src="x" onerror="alert(1)"><a href="javascript:alert(1)" title="ok">Link</a> After',
+        loading: false,
+      },
+      customId: 'react-safe-html-inline',
+    })
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(React.Fragment, null, blockNode, inlineNode)),
+      )
+    })
+    await flushReact()
+
+    const imgs = Array.from(host.querySelectorAll('img'))
+    const links = Array.from(host.querySelectorAll('a'))
+
+    expect(imgs.length).toBeGreaterThan(0)
+    imgs.forEach(img => expect(img.getAttribute('onerror')).toBeNull())
+    expect(links.length).toBeGreaterThan(0)
+    links.forEach((link) => {
+      expect(link.getAttribute('href')).toBeNull()
+      expect(link.getAttribute('title')).toBe('ok')
+    })
+    expect(host.innerHTML).not.toContain('<script')
+    expect(host.innerHTML).not.toContain('javascript:')
+    expect(host.innerHTML).not.toContain('alert(1)')
+
+    root.unmount()
+  })
+
+  it('renders markdown children inside standard html wrappers exactly once', async () => {
+    const scopeId = 'react-structured-html-wrapper'
+    const markdown = `<span style="font-size: 12px;">
+
+- alpha
+- beta
+
+</span>`
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: markdown,
+          customId: scopeId,
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelectorAll('ul')).toHaveLength(1)
+    expect(host.querySelectorAll('li')).toHaveLength(2)
+    expect((host.textContent || '').match(/alpha/g)?.length ?? 0).toBe(1)
+    expect((host.textContent || '').match(/beta/g)?.length ?? 0).toBe(1)
+
+    root.unmount()
+  })
+
+  it('does not structure blocked html wrappers into live markdown children', async () => {
+    const scopeId = 'react-structured-blocked-tag'
+    const markdown = `<script>
+
+- alpha
+- beta
+
+</script>`
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: markdown,
+          customId: scopeId,
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelectorAll('ul')).toHaveLength(0)
+    expect(host.querySelectorAll('li')).toHaveLength(0)
 
     root.unmount()
   })

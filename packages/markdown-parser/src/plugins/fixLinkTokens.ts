@@ -1,5 +1,6 @@
 import type { MarkdownIt } from 'markdown-it-ts'
 import type { MarkdownToken } from '../types'
+import { shouldDemoteFilenameLikeLinkify } from '../parser/linkifyHeuristics'
 
 // We hard-stop FULLWIDTH exclamation mark used as CJK punctuation.
 // ASCII `!` is valid in URLs (path/query/fragment), so do not stop on it.
@@ -108,6 +109,17 @@ function setHrefOnLinkOpen(token: any, href: string) {
     token.attrs.push(['href', href])
 }
 
+function collectLinkifyText(tokens: MarkdownToken[], openIndex: number, closeIndex: number) {
+  let text = ''
+  for (let index = openIndex + 1; index < closeIndex; index++) {
+    const token = tokens[index]
+    if (token?.type !== 'text' || typeof token.content !== 'string')
+      return null
+    text += token.content
+  }
+  return text || null
+}
+
 export function applyFixLinkTokens(md: MarkdownIt) {
   // Run after the inline rule so markdown-it has produced inline tokens
   // for block-level tokens; we then adjust each inline token's children
@@ -162,6 +174,16 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         }
       }
       if (closeIdx !== -1) {
+        const linkText = collectLinkifyText(tokens, i, closeIdx)
+        if (
+          curToken.markup === 'linkify'
+          && linkText
+          && shouldDemoteFilenameLikeLinkify(linkText)
+        ) {
+          tokens.splice(i, closeIdx - i + 1, textToken(linkText) as any)
+          continue
+        }
+
         const href = getHrefFromLinkOpen(curToken as any)
         const hrefStop = firstIndexOfAny(href, LINKIFY_HARD_STOP_CHARS)
         // Prefer splitting by the visible text token, but also trim href if it contains stop chars.

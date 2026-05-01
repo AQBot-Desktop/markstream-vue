@@ -1,4 +1,34 @@
+import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
+import MarkdownCodeBlockNode from '../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue'
+
+function makeNode(code = 'console.log(1)') {
+  return {
+    type: 'code_block' as const,
+    language: 'plaintext',
+    code,
+    raw: `\`\`\`txt\n${code}\n\`\`\``,
+  }
+}
+
+function makeScrollable(element: HTMLElement) {
+  Object.defineProperty(element, 'scrollHeight', {
+    configurable: true,
+    value: 1000,
+  })
+  Object.defineProperty(element, 'clientHeight', {
+    configurable: true,
+    value: 100,
+  })
+  element.scrollTop = 0
+}
+
+async function flushCodeWatchers() {
+  await nextTick()
+  await Promise.resolve()
+  await nextTick()
+}
 
 describe('markdownCodeBlockNode props and features', () => {
   it('should support all header control props', () => {
@@ -75,5 +105,47 @@ describe('markdownCodeBlockNode props and features', () => {
     expect(isAtBottom(1000, 840, 100, 50)).toBe(false) // beyond threshold (60px from bottom)
     expect(isAtBottom(1000, 500, 100, 50)).toBe(false) // in middle
     expect(isAtBottom(1000, 0, 100, 50)).toBe(false) // at top
+  })
+
+  it('should not auto-scroll when autoScrollOnUpdate is false', async () => {
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode(),
+        autoScrollOnUpdate: false,
+      },
+    })
+
+    const content = wrapper.get('.code-block-content').element as HTMLElement
+    makeScrollable(content)
+
+    await wrapper.setProps({
+      node: makeNode('line\n'.repeat(80)),
+    })
+    await flushCodeWatchers()
+
+    expect(content.scrollTop).toBe(0)
+    wrapper.unmount()
+  })
+
+  it('should start with auto-scroll disabled when autoScrollInitial is false', async () => {
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode(),
+        autoScrollInitial: false,
+      },
+    })
+
+    const content = wrapper.get('.code-block-content').element as HTMLElement
+    makeScrollable(content)
+
+    await wrapper.setProps({
+      node: makeNode('line\n'.repeat(80)),
+    })
+    await flushCodeWatchers()
+
+    expect(content.scrollTop).toBe(0)
+    wrapper.unmount()
   })
 })

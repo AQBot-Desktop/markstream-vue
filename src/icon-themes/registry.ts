@@ -38,17 +38,20 @@ export function getRegisteredThemes(): string[] {
 
 export function resolveFromTheme(normalized: string): string | undefined {
   const theme = themes.get(activeThemeId)
-  if (!theme) return undefined
+  if (!theme)
+    return undefined
 
   // Core map (sync)
   const coreHit = theme.core[normalized]
-  if (coreHit) return coreHit
+  if (coreHit)
+    return coreHit
 
   // Extended map (cached async)
   const ext = extendedCache.get(theme.id)
   if (ext) {
     const extHit = ext[normalized]
-    if (extHit) return extHit
+    if (extHit)
+      return extHit
   }
 
   // Trigger lazy load if available

@@ -1,6 +1,10 @@
 import type { ComponentType } from 'react'
 
-export type CustomComponentMap = Record<string, ComponentType<any>>
+export type CustomComponentDisplayMode = 'inline' | 'block'
+export type MarkstreamCustomComponent<P = any> = ComponentType<P> & {
+  markstreamDisplay?: CustomComponentDisplayMode
+}
+export type CustomComponentMap = Record<string, MarkstreamCustomComponent<any>>
 
 const GLOBAL_KEY = '__global__'
 
@@ -83,4 +87,16 @@ export function removeCustomComponents(id: string) {
 export function clearGlobalCustomComponents() {
   delete store.scopedComponents[GLOBAL_KEY]
   bumpRevision()
+}
+
+export function getCustomComponentDisplay(component: ComponentType<any> | null | undefined): CustomComponentDisplayMode | undefined {
+  return (component as MarkstreamCustomComponent<any> | null | undefined)?.markstreamDisplay
+}
+
+export function withMarkstreamComponentDisplay<T extends ComponentType<any>>(
+  component: T,
+  display: CustomComponentDisplayMode,
+) {
+  ;(component as MarkstreamCustomComponent<any>).markstreamDisplay = display
+  return component as T & { markstreamDisplay: CustomComponentDisplayMode }
 }

@@ -21,21 +21,31 @@ export function parseColor(str) {
     return parseHex(str)
 
   // rgb / rgba
-  const rgbMatch = str.match(/^rgba?\(\s*([^)]+)\)$/i)
-  if (rgbMatch)
-    return parseRgbArgs(rgbMatch[1])
+  const rgbArgs = extractFunctionArgs(str, ['rgb', 'rgba'])
+  if (rgbArgs)
+    return parseRgbArgs(rgbArgs)
 
   // hsl / hsla  →  convert to rgb internally
-  const hslMatch = str.match(/^hsla?\(\s*([^)]+)\)$/i)
-  if (hslMatch)
-    return parseHslArgs(hslMatch[1])
+  const hslArgs = extractFunctionArgs(str, ['hsl', 'hsla'])
+  if (hslArgs)
+    return parseHslArgs(hslArgs)
 
   // oklch  →  convert to rgb via OKLab → linear RGB → sRGB
-  const oklchMatch = str.match(/^oklch\(\s*([^)]+)\)$/i)
-  if (oklchMatch)
-    return parseOklchArgs(oklchMatch[1])
+  const oklchArgs = extractFunctionArgs(str, ['oklch'])
+  if (oklchArgs)
+    return parseOklchArgs(oklchArgs)
 
   throw new Error(`Unsupported color format: "${str}"`)
+}
+
+function extractFunctionArgs(str, names) {
+  const lower = str.toLowerCase()
+  for (const name of names) {
+    const prefix = `${name}(`
+    if (lower.startsWith(prefix) && str.endsWith(')'))
+      return str.slice(prefix.length, -1).trim()
+  }
+  return null
 }
 
 function parseHex(hex) {
@@ -120,7 +130,8 @@ function parseAlpha(v) {
  * Note: 'grad' must be checked before 'rad' since 'grad'.endsWith('rad') === true.
  */
 function parseAngle(raw, numericValue) {
-  if (!raw) return numericValue
+  if (!raw)
+    return numericValue
   if (raw.endsWith('grad'))
     return numericValue * 0.9
   if (raw.endsWith('rad'))
@@ -221,8 +232,7 @@ function gammaEncodeRgb({ lr, lg, lb }) {
  * OKLab → sRGB { r, g, b } (0-255). Direct conversion with gamma encode + clamp.
  * Used internally for achromatic fast path.
  */
-function oklabToLinearSrgb_gammaEncode(L, a, b) {
-  const channels = oklchToLinearSrgbChannels(L, 0, 0)
+function oklabToLinearSrgb_gammaEncode(L) {
   // For achromatic, a=0 b=0 so we just need L → LMS → linear RGB
   const l_ = L
   const m_ = L
@@ -272,7 +282,8 @@ export function rgbToOklch(r, g, b) {
   const { L, a, b: b_ } = srgbToOklab(r, g, b)
   const c = Math.sqrt(a * a + b_ * b_)
   let h = Math.atan2(b_, a) * 180 / Math.PI
-  if (h < 0) h += 360
+  if (h < 0)
+    h += 360
   return {
     l: round(L, 4),
     c: round(c, 4),
@@ -289,8 +300,10 @@ export function oklchToRgb(l, c, h) {
 
 /** sRGB gamma encode (linear → gamma). */
 function linearToGamma(x) {
-  if (x <= 0) return 0
-  if (x >= 1) return 1
+  if (x <= 0)
+    return 0
+  if (x >= 1)
+    return 1
   return x <= 0.0031308
     ? 12.92 * x
     : 1.055 * (x ** (1 / 2.4)) - 0.055
@@ -298,8 +311,10 @@ function linearToGamma(x) {
 
 /** sRGB gamma decode (gamma → linear). */
 function gammaToLinear(x) {
-  if (x <= 0) return 0
-  if (x >= 1) return 1
+  if (x <= 0)
+    return 0
+  if (x >= 1)
+    return 1
   return x <= 0.04045
     ? x / 12.92
     : ((x + 0.055) / 1.055) ** 2.4
@@ -357,11 +372,16 @@ function hslToRgbRaw(h, s, l) {
   const m = l - c / 2
 
   let r, g, b
-  if (h < 60) [r, g, b] = [c, x, 0]
-  else if (h < 120) [r, g, b] = [x, c, 0]
-  else if (h < 180) [r, g, b] = [0, c, x]
-  else if (h < 240) [r, g, b] = [0, x, c]
-  else if (h < 300) [r, g, b] = [x, 0, c]
+  if (h < 60)
+    [r, g, b] = [c, x, 0]
+  else if (h < 120)
+    [r, g, b] = [x, c, 0]
+  else if (h < 180)
+    [r, g, b] = [0, c, x]
+  else if (h < 240)
+    [r, g, b] = [0, x, c]
+  else if (h < 300)
+    [r, g, b] = [x, 0, c]
   else [r, g, b] = [c, 0, x]
 
   return {
@@ -435,7 +455,8 @@ export function toOklch(color) {
 export function toOklchCss(color) {
   const { l, c, h, a } = toOklch(color)
   const base = `oklch(${round(l, 4)} ${round(c, 4)} ${round(h, 2)})`
-  if (a < 1) return `oklch(${round(l, 4)} ${round(c, 4)} ${round(h, 2)} / ${round(a, 3)})`
+  if (a < 1)
+    return `oklch(${round(l, 4)} ${round(c, 4)} ${round(h, 2)} / ${round(a, 3)})`
   return base
 }
 
@@ -590,7 +611,9 @@ function lerp(a, b, t) {
  */
 function lerpHue(a, b, t) {
   let diff = b - a
-  if (diff > 180) diff -= 360
-  if (diff < -180) diff += 360
+  if (diff > 180)
+    diff -= 360
+  if (diff < -180)
+    diff += 360
   return ((a + diff * t) % 360 + 360) % 360
 }

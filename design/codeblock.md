@@ -126,7 +126,7 @@ interface CodeBlockProps {
    *
    * - 未指定：使用内置默认 light/dark 主题
    */
-  theme?: CodeBlockTheme | { light: CodeBlockTheme; dark: CodeBlockTheme }
+  theme?: CodeBlockTheme | { light: CodeBlockTheme, dark: CodeBlockTheme }
 }
 ```
 
@@ -167,7 +167,8 @@ const activeTheme = computed(() => {
 
 ```ts
 const resolvedThemeProp = computed(() => {
-  if (props.theme) return props.theme
+  if (props.theme)
+    return props.theme
   // 向后兼容
   if (props.darkTheme || props.lightTheme) {
     return { light: props.lightTheme ?? DEFAULT_LIGHT, dark: props.darkTheme ?? DEFAULT_DARK }
@@ -186,7 +187,8 @@ const resolvedThemeProp = computed(() => {
 const editorSurfaceIsDark = computed(() => {
   const t = activeTheme.value
   // 配对模式：跟随页面
-  if (!props.theme || isPairedTheme(props.theme)) return isDark.value
+  if (!props.theme || isPairedTheme(props.theme))
+    return isDark.value
   // 单主题模式：检测主题名/亮度
   return detectThemeDarkness(t)
 })
@@ -196,7 +198,8 @@ const editorSurfaceIsDark = computed(() => {
 
 ```ts
 function detectThemeDarkness(theme: CodeBlockTheme): boolean {
-  if (typeof theme === 'string') return themeLooksDark(theme)
+  if (typeof theme === 'string')
+    return themeLooksDark(theme)
   // 主题对象：检测 background 色的亮度
   if (theme.colors?.['editor.background']) {
     return getLuminance(theme.colors['editor.background']) < 128

@@ -27,7 +27,7 @@ For docs sites, `content` is usually the right default:
 ## 2. Install the smallest docs-friendly set
 
 ```bash
-pnpm add markstream-vue shiki stream-markdown
+pnpm add markstream-vue stream-markdown
 ```
 
 That gives you a good default for docs sites: regular Markdown rendering plus lightweight highlighted code blocks.

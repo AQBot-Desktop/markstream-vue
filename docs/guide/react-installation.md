@@ -26,7 +26,7 @@ markstream-react supports various features through optional peer dependencies. I
 
 | Feature | Required Packages | Install Command |
 |---------|------------------|-----------------|
-| Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki code blocks (`MarkdownCodeBlockNode`) | `stream-markdown` | `pnpm add stream-markdown` |
 | Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
 | D2 Diagrams | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
@@ -82,22 +82,22 @@ This approach ensures that Tailwind includes all the utility classes used by mar
 To enable all features at once:
 
 ```bash
-pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+pnpm add stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 # or
-npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+npm install stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ### Feature Details
 
 #### Code Syntax Highlighting
 
-Requires both `shiki` and `stream-markdown`:
+Requires `stream-markdown`:
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 ```
 
-These packages power the Shiki-based `MarkdownCodeBlockNode`. To use Shiki inside `MarkdownRender`, override the `code_block` renderer (or render `MarkdownCodeBlockNode` directly).
+`stream-markdown` bundles the Shiki runtime used by `MarkdownCodeBlockNode`. To use Shiki inside `MarkdownRender`, override the `code_block` renderer (or render `MarkdownCodeBlockNode` directly).
 
 ```tsx
 import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-react'

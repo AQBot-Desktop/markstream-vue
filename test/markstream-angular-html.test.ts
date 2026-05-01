@@ -94,7 +94,8 @@ describe('markstream-angular html renderer', () => {
     })
 
     expect(html).toContain('<details>')
-    expect(html).toContain('<summary>More</summary>')
+    expect(html).toContain('<summary>')
+    expect(html).toContain('More')
     expect(html).toContain('<p>Body</p>')
     expect(html).toContain('</details>')
   })
@@ -123,6 +124,18 @@ describe('markstream-angular html renderer', () => {
     expect(html).toContain('markstream-nested-math-block__render')
   })
 
+  it('keeps softbreak text visible and renders references like the runtime renderer', () => {
+    const html = renderMarkdownToHtml({
+      content: '第一行\n第二行[3]',
+      final: true,
+    })
+
+    expect(html).toContain('class="markstream-angular-text-node"')
+    expect(html).toContain('第一行\n第二行')
+    expect(html).toContain('<span class="markstream-nested-reference">3</span>')
+    expect(html).not.toContain('<sup class="markstream-nested-reference">')
+  })
+
   it('sanitizes dangerous html while preserving safe attributes', () => {
     const html = sanitizeHtmlFragment('<details open onclick="evil()"><summary>Safe</summary><a href="javascript:alert(1)" title="ok">Link</a><script>alert(1)</script></details>')
 
@@ -133,5 +146,121 @@ describe('markstream-angular html renderer', () => {
     expect(html).not.toContain('javascript:')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('alert(1)')
+  })
+
+  it('renders structured html wrappers while leaving blocked tags on the sanitized fallback path', () => {
+    const structuredHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'span',
+        raw: '<span style="font-size: 12px;"></span>',
+        content: '<span style="font-size: 12px;"></span>',
+        attrs: [['style', 'font-size: 12px;']],
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'beta' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(structuredHtml).toContain('<span style="font-size: 12px;">')
+    expect(structuredHtml).toContain('<ul><li>alpha</li><li>beta</li></ul>')
+
+    const blockedHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'script',
+        raw: '<script>\n\n- alpha\n\n</script>',
+        content: '<script>\n\n- alpha\n\n</script>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(blockedHtml).not.toContain('<ul>')
+    expect(blockedHtml).not.toContain('<li>')
+    expect(blockedHtml).not.toContain('<script')
+
+    const literalHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'pre',
+        raw: '<pre>\n\n- alpha\n\n</pre>',
+        content: '<pre>\n\n- alpha\n\n</pre>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(literalHtml).not.toContain('<ul>')
+    expect(literalHtml).not.toContain('<li>')
+    expect(literalHtml).toContain('<pre>')
+  })
+
+  it('sanitizes dangerous attrs on structured html wrappers', () => {
+    const html = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'a',
+        raw: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        attrs: [
+          ['href', 'javascript:alert(1)'],
+          ['onclick', 'alert(1)'],
+          ['data-safe', 'ok'],
+        ],
+        children: [
+          {
+            type: 'paragraph',
+            raw: 'safe child',
+            children: [{ type: 'text', raw: 'safe child', content: 'safe child' }],
+          },
+        ],
+      } as any,
+    )
+
+    expect(html).toContain('<a data-safe="ok">')
+    expect(html).toContain('<p>safe child</p>')
+    expect(html).not.toContain('onclick=')
+    expect(html).not.toContain('javascript:')
   })
 })

@@ -11,15 +11,17 @@ import { resolveStreamingTextState } from './streamingTextState'
   imports: [CommonModule],
   template: `
     <ng-container *ngIf="!centered; else centeredText">
-      <span *ngIf="settledText">{{ settledText }}</span>
-      <span
-        *ngIf="streamedDelta"
-        [class]="'markstream-angular-text__stream-delta ' + streamedDeltaClass"
-        (animationend)="settleStreamedDelta()"
-      >{{ streamedDelta }}</span>
+      <span class="markstream-angular-text-node">
+        <span *ngIf="settledText">{{ settledText }}</span>
+        <span
+          *ngIf="streamedDelta"
+          [class]="'markstream-angular-text__stream-delta ' + streamedDeltaClass"
+          (animationend)="settleStreamedDelta()"
+        >{{ streamedDelta }}</span>
+      </span>
     </ng-container>
     <ng-template #centeredText>
-      <span class="markstream-angular-text--centered">
+      <span class="markstream-angular-text-node markstream-angular-text--centered">
         <span *ngIf="settledText">{{ settledText }}</span>
         <span
           *ngIf="streamedDelta"

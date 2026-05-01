@@ -6,7 +6,6 @@ export const BLOCK_LEVEL_TYPES = new Set([
   'table',
   'code_block',
   'html_block',
-  'html_inline',
   'blockquote',
   'list',
   'list_item',

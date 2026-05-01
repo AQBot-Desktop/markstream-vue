@@ -5,7 +5,7 @@
 代码块渲染有三种策略，取决于你安装的可选依赖与配置：
 
 - Monaco（推荐，用于大型/交互式代码块）：安装并使用 `stream-monaco`，提供类似编辑器的流式增量渲染体验。库在运行时按需懒加载 `stream-monaco`。
-- Shiki（MarkdownCodeBlockNode）：安装 `shiki` + `stream-markdown`，并通过 `setCustomComponents` 覆盖 `code_block` 节点以使用轻量的 Markdown 渲染器。
+- Shiki（MarkdownCodeBlockNode）：安装 `stream-markdown`，并通过 `setCustomComponents` 覆盖 `code_block` 节点以使用轻量的 Markdown 渲染器。
 - 回退（无额外依赖）：如果两个可选包均未安装，代码块会退回为普通的 `<pre><code>` 渲染（仅基础样式 / 无 Monaco 功能）。
 
 ## Monaco（推荐）
@@ -28,9 +28,9 @@ npm i stream-monaco
 - 安装：
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 # or
-npm i shiki stream-markdown
+npm i stream-markdown
 ```
 
 - 通过 `setCustomComponents` 覆盖 `code_block` 节点以注册 Shiki 版渲染器。示例：

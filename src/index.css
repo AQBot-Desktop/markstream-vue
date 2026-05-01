@@ -39,32 +39,33 @@
 
 .markstream-vue {
 
-  /* Bridge: inherit shadcn compat variables */
-  --ms-background:              var(--background,             0 0% 100%);
-  --ms-foreground:              var(--foreground,             0 0% 10%);
+  /* Base tokens — self-contained defaults.
+   * Override --ms-* directly to customise (e.g. .markstream-vue { --ms-foreground: ... }). */
+  --ms-background:              0 0% 100%;
+  --ms-foreground:              0 0% 10%;
 
-  --ms-muted:                   var(--muted,                  0 0% 96.5%);
-  --ms-muted-foreground:        var(--muted-foreground,       0 0% 43%);
+  --ms-muted:                   0 0% 96.5%;
+  --ms-muted-foreground:        0 0% 43%;
 
-  --ms-secondary:               var(--secondary,              0 0% 93.5%);
-  --ms-secondary-foreground:    var(--secondary-foreground,   0 0% 10%);
+  --ms-secondary:               0 0% 93.5%;
+  --ms-secondary-foreground:    0 0% 10%;
 
-  --ms-accent:                  var(--accent,                 0 0% 91%);
-  --ms-accent-foreground:       var(--accent-foreground,      0 0% 10%);
+  --ms-accent:                  0 0% 91%;
+  --ms-accent-foreground:       0 0% 10%;
 
-  --ms-primary:                 var(--primary,                0 0% 10%);
-  --ms-primary-foreground:      var(--primary-foreground,     0 0% 100%);
+  --ms-primary:                 0 0% 10%;
+  --ms-primary-foreground:      0 0% 100%;
 
-  --ms-destructive:             var(--destructive,            0 62% 52%);
-  --ms-destructive-foreground:  var(--destructive-foreground, 0 0% 100%);
+  --ms-destructive:             0 62% 52%;
+  --ms-destructive-foreground:  0 0% 100%;
 
-  --ms-border:                  var(--border,                 0 0% 87%);
-  --ms-ring:                    var(--ring,                   0 0% 10%);
+  --ms-border:                  0 0% 87%;
+  --ms-ring:                    0 0% 10%;
 
-  --ms-popover:                 var(--popover,                0 0% 100%);
-  --ms-popover-foreground:      var(--popover-foreground,     0 0% 10%);
+  --ms-popover:                 0 0% 100%;
+  --ms-popover-foreground:      0 0% 10%;
 
-  --ms-radius:                  var(--radius,                 0.5rem);
+  --ms-radius:                  0.5rem;
 
   /* Extension: markdown-specific, no shadcn collision
    * Functional colors: unified sat ~58-64%, lightness tuned for
@@ -94,32 +95,32 @@
 .dark .markstream-vue,
 .markstream-vue.dark {
 
-  /* Bridge: dark fallbacks (used when host has no dark tokens)
+  /* Dark defaults
    * Neutral steps: bg 7 → muted 12 → secondary 16 → border 20 → accent 24
    * Ensures each surface level is visually distinguishable. */
-  --ms-background:              var(--background,             0 0% 7%);
-  --ms-foreground:              var(--foreground,             0 0% 93%);
+  --ms-background:              0 0% 7%;
+  --ms-foreground:              0 0% 93%;
 
-  --ms-muted:                   var(--muted,                  0 0% 12%);
-  --ms-muted-foreground:        var(--muted-foreground,       0 0% 60%);
+  --ms-muted:                   0 0% 12%;
+  --ms-muted-foreground:        0 0% 60%;
 
-  --ms-secondary:               var(--secondary,              0 0% 16%);
-  --ms-secondary-foreground:    var(--secondary-foreground,   0 0% 93%);
+  --ms-secondary:               0 0% 16%;
+  --ms-secondary-foreground:    0 0% 93%;
 
-  --ms-accent:                  var(--accent,                 0 0% 24%);
-  --ms-accent-foreground:       var(--accent-foreground,      0 0% 93%);
+  --ms-accent:                  0 0% 24%;
+  --ms-accent-foreground:       0 0% 93%;
 
-  --ms-primary:                 var(--primary,                0 0% 93%);
-  --ms-primary-foreground:      var(--primary-foreground,     0 0% 10%);
+  --ms-primary:                 0 0% 93%;
+  --ms-primary-foreground:      0 0% 10%;
 
-  --ms-destructive:             var(--destructive,            0 60% 50%);
-  --ms-destructive-foreground:  var(--destructive-foreground, 0 0% 93%);
+  --ms-destructive:             0 60% 50%;
+  --ms-destructive-foreground:  0 0% 93%;
 
-  --ms-border:                  var(--border,                 0 0% 20%);
-  --ms-ring:                    var(--ring,                   0 0% 80%);
+  --ms-border:                  0 0% 20%;
+  --ms-ring:                    0 0% 80%;
 
-  --ms-popover:                 var(--popover,                0 0% 9%);
-  --ms-popover-foreground:      var(--popover-foreground,     0 0% 93%);
+  --ms-popover:                 0 0% 9%;
+  --ms-popover-foreground:      0 0% 93%;
 
   /* Extension: dark overrides — lightness lifted for readability */
   --ms-info:                    215 55% 62%;

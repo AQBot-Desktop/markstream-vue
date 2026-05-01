@@ -155,7 +155,7 @@ export function ensureParity(name: string) {
 
 下面这个样例更适合观察 **code block stream** 和折叠逻辑：
 
-\`\`\`diff
+\`\`\`diff typescript
 diff --git a/src/render.ts b/src/render.ts
 index 0000000..1111111 100644
 --- a/src/render.ts

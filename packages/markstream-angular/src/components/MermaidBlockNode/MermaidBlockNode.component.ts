@@ -13,6 +13,7 @@ import {
 import { getMermaid } from '../../optional/mermaid'
 import { toSafeSvgMarkup } from '../../sanitizeSvg'
 import { canParseOffthread, findPrefixOffthread } from '../../workers/mermaidWorkerClient'
+import { clampPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../shared/diagram-height'
 import { getString } from '../shared/node-helpers'
 import {
   clampNumber,
@@ -132,6 +133,8 @@ function enqueueMermaidRender<T>(run: () => Promise<T>) {
           *ngIf="!showSource"
           class="mermaid-preview"
           [style.maxHeight]="resolvedMaxHeight"
+          [style.minHeight.px]="estimatedPreviewHeightPx"
+          [style.height.px]="estimatedPreviewHeightPx"
           [style.transform]="previewTransform"
         >
           <div #previewHost class="markstream-angular-mermaid" [class.is-empty]="!svgMarkup"></div>
@@ -254,6 +257,20 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
 
   get resolvedMaxHeight() {
     return resolveCssSize(this.mergedProps.maxHeight, '500px')
+  }
+
+  get estimatedPreviewHeightPx() {
+    return clampPreviewHeight(
+      parsePositiveNumber(this.mergedProps.estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(this.code),
+      undefined,
+      this.maxPreviewHeight,
+    )
+  }
+
+  private get maxPreviewHeight() {
+    if (this.mergedProps.maxHeight == null || this.mergedProps.maxHeight === 'none')
+      return this.mergedProps.maxHeight === 'none' ? null : 500
+    return parsePositiveNumber(this.mergedProps.maxHeight) ?? 500
   }
 
   get resolvedWorkerTimeout() {

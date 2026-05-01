@@ -1,7 +1,7 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions } from '../types'
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
-import { STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
+import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import { parseInlineTokens } from './inline-parsers'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -269,6 +269,23 @@ function buildHtmlBlockContent(raw: string, tag: string, closed: boolean) {
   return `${raw.replace(/<[^>]*$/, '')}\n</${tag}>`
 }
 
+function normalizeIndentedSourceForLookup(value: string) {
+  return value
+    .replace(/\r\n/g, '\n')
+    .replace(/(^|\n)[ \t]{1,4}/g, '$1')
+}
+
+function canFindNodeRawAfterSourceIndex(source: string, startIndex: number, nodeRaw: string) {
+  if (!nodeRaw)
+    return false
+
+  if (source.includes(nodeRaw, startIndex))
+    return true
+
+  const tail = source.slice(Math.max(0, startIndex))
+  return normalizeIndentedSourceForLookup(tail).includes(normalizeIndentedSourceForLookup(nodeRaw))
+}
+
 function extendHtmlBlockCloseToLineEnding(source: string, startIndex: number) {
   let end = Math.max(0, startIndex)
 
@@ -322,6 +339,95 @@ function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): P
     customHtmlTags: options.customHtmlTags,
     validateLink: options.validateLink,
   }
+}
+
+const STRUCTURED_HTML_WRAPPER_BLOCK_TYPES = new Set([
+  'admonition',
+  'blockquote',
+  'code_block',
+  'definition_list',
+  'footnote',
+  'heading',
+  'list',
+  'math_block',
+  'table',
+  'thematic_break',
+])
+
+const STRUCTURED_HTML_WRAPPER_MARKER_RE = /(?:^|\n)\s{0,3}(?:#{1,6}\s+\S|[-+*]\s+\S|\d+[.)]\s+\S|>\s*\S|`{3,}|~{3,}|(?:\*{3,}|-{3,}|_{3,})(?:\s|$)|\|.*\|)/m
+
+function hasStructuredHtmlWrapperMarkers(fragment: string) {
+  return /\n\s*\n/.test(fragment) || STRUCTURED_HTML_WRAPPER_MARKER_RE.test(fragment)
+}
+
+function shouldStructureGenericHtmlBlockChildren(
+  innerRaw: string,
+  children: ParsedNode[],
+) {
+  if (!innerRaw.trim() || children.length === 0)
+    return false
+
+  if (children.some(child => STRUCTURED_HTML_WRAPPER_BLOCK_TYPES.has(String(child?.type ?? '').toLowerCase())))
+    return true
+
+  if (children.some((child) => {
+    if (child?.type !== 'html_block')
+      return false
+    return Array.isArray((child as any)?.children) && (child as any).children.length > 0
+  })) {
+    return true
+  }
+
+  if (!hasStructuredHtmlWrapperMarkers(innerRaw))
+    return false
+
+  if (children.length > 1)
+    return true
+
+  const [first] = children
+  return Boolean(first && first.type === 'paragraph')
+}
+
+function structureGenericHtmlBlockChildren(
+  nodes: ParsedNode[],
+  md: MarkdownIt,
+  options: ParseOptions,
+  final: boolean,
+): ParsedNode[] {
+  return nodes.map((node) => {
+    if (node?.type !== 'html_block')
+      return node
+
+    const tag = String((node as any)?.tag ?? '').toLowerCase()
+    if (!tag || tag === 'details' || NON_STRUCTURING_HTML_TAGS.has(tag) || Array.isArray((node as any)?.children))
+      return node
+
+    const raw = String((node as any)?.raw ?? (node as any)?.content ?? '')
+    if (!raw)
+      return node
+
+    const openEnd = findTagCloseIndexOutsideQuotes(raw)
+    if (openEnd === -1)
+      return node
+
+    const closeStart = findLastClosingTagStart(raw, tag)
+    const hasClose = closeStart !== -1 && closeStart >= openEnd + 1
+    const innerRaw = hasClose
+      ? raw.slice(openEnd + 1, closeStart)
+      : raw.slice(openEnd + 1)
+
+    if (!innerRaw.trim())
+      return node
+
+    const children = parseDetailsFragmentChildren(innerRaw, md, buildDetailsChildParseOptions(options, final))
+    if (!shouldStructureGenericHtmlBlockChildren(innerRaw, children))
+      return node
+
+    return {
+      ...node,
+      children,
+    } as ParsedNode
+  })
 }
 
 function parseDetailsFragmentChildren(
@@ -556,10 +662,14 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
     const nextContent = buildHtmlBlockContent(exact.raw, tag, exact.closed)
     const desiredLoading = !final && !exact.closed
     const needsExpansion = currentContent !== nextContent || currentRaw !== exact.raw || Boolean(node?.loading) !== desiredLoading
+    const exactOpenEnd = findTagCloseIndexOutsideQuotes(exact.raw)
+    const exactOpenTag = exactOpenEnd === -1 ? '' : exact.raw.slice(0, exactOpenEnd + 1)
+    const exactAttrs = exactOpenTag ? parseTagAttrs(exactOpenTag) : []
 
     node.content = nextContent
     node.raw = exact.raw
     node.loading = desiredLoading
+    node.attrs = exactAttrs.length ? exactAttrs : undefined
 
     if (!needsExpansion)
       continue
@@ -578,8 +688,12 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
       if (!nextRaw)
         break
       const nextPos = exact.raw.indexOf(nextRaw, tailCursor)
-      if (nextPos === -1)
-        break
+      if (nextPos === -1) {
+        if (canFindNodeRawAfterSourceIndex(source, exact.end, nextRaw))
+          break
+        merged.splice(j, 1)
+        continue
+      }
       tailCursor = nextPos + nextRaw.length
       merged.splice(j, 1)
     }
@@ -1895,6 +2009,7 @@ export function parseMarkdownToStructure(
 
   result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown)
   result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, options, isFinal)[0]
+  result = structureGenericHtmlBlockChildren(result, md, options, isFinal)
 
   if (isFinal) {
     const seen = new WeakSet<object>()

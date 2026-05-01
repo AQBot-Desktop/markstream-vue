@@ -37,7 +37,7 @@ exports[`e2e markdown parsing (fixtures) > parses fixture code-diff.md > code-di
     "firstText": undefined,
     "language": "",
     "preview": "@@
-  new line
+ new line
 ",
     "type": "code_block",
   },

@@ -26,6 +26,7 @@ Read [references/patterns.md](references/patterns.md) before choosing an overrid
    - Pass the same custom-tag allowlist to nested renderers.
 5. Keep props and cleanup intact.
    - Preserve `node`, `loading`, `indexKey`, `customId`, and `isDark`.
+   - For `mermaid` and `infographic` overrides, preserve `estimatedPreviewHeightPx` so async preview shells keep stable height during remounts.
    - Remove temporary scoped mappings with `removeCustomComponents(customId)` when the scope is no longer needed.
 6. Validate with the smallest useful check.
    - Prefer a local demo, targeted test, or docs build.

@@ -12,10 +12,8 @@
 
 import {
   adjustLightness,
-  adjustSaturation,
   contrastRatio,
   hslToRgb,
-  hslToShadcn,
   meetsAA,
   rgbToHsl,
   toHsl,
@@ -244,7 +242,8 @@ export function validateContrast(tokens) {
     const muted = parseShadcnHsl(tokens.muted)
     const alpha = isLight ? 0.06 : 0.12
     for (const key of ['info', 'success', 'warning']) {
-      if (!tokens[key]) continue
+      if (!tokens[key])
+        continue
       const semColor = parseShadcnHsl(tokens[key])
       const headerBg = alphaBlendHsl(semColor, muted, alpha)
       const ratio = contrastRatio(semColor, headerBg)
@@ -252,11 +251,12 @@ export function validateContrast(tokens) {
     }
   }
 
-  return pairs.map(([fgKey, bgKey, label, threshold, severity, preRatio, preBg]) => {
+  return pairs.map(([fgKey, bgKey, label, threshold, severity, preRatio]) => {
     let ratio
     if (preRatio !== undefined) {
       ratio = preRatio
-    } else {
+    }
+    else {
       const fg = parseShadcnHsl(tokens[fgKey])
       const bg = parseShadcnHsl(tokens[bgKey])
       ratio = contrastRatio(fg, bg)
@@ -312,11 +312,16 @@ function hslToHex({ h, s, l }) {
   const x = c * (1 - Math.abs((h / 60) % 2 - 1))
   const m = l - c / 2
   let r, g, b
-  if (h < 60) [r, g, b] = [c, x, 0]
-  else if (h < 120) [r, g, b] = [x, c, 0]
-  else if (h < 180) [r, g, b] = [0, c, x]
-  else if (h < 240) [r, g, b] = [0, x, c]
-  else if (h < 300) [r, g, b] = [x, 0, c]
+  if (h < 60)
+    [r, g, b] = [c, x, 0]
+  else if (h < 120)
+    [r, g, b] = [x, c, 0]
+  else if (h < 180)
+    [r, g, b] = [0, c, x]
+  else if (h < 240)
+    [r, g, b] = [0, x, c]
+  else if (h < 300)
+    [r, g, b] = [x, 0, c]
   else [r, g, b] = [c, 0, x]
 
   const toHex = v => Math.round((v + m) * 255).toString(16).padStart(2, '0')

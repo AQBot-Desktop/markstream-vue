@@ -14,6 +14,10 @@ export function setInfographicLoader(loader: InfographicLoader | null) {
   resetCachedInfographic()
 }
 
+export function isInfographicEnabled() {
+  return infographicLoader !== null
+}
+
 export async function getInfographic() {
   if (cachedInfographic)
     return cachedInfographic

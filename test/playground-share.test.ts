@@ -1,9 +1,9 @@
 import { compressToEncodedURIComponent } from 'lz-string'
 import { describe, expect, it } from 'vitest'
-import { createMarkdownHash, decodeMarkdownHash } from '../playground-shared/testPageState'
+import { createMarkdownHash, createMarkdownHashAsync, decodeMarkdownHash, decodeMarkdownHashAsync } from '../playground-shared/testPageState'
 
 describe('playground share payload', () => {
-  it('prefers the stronger deflate codec for large markdown payloads', () => {
+  it('prefers Brotli for large markdown payloads', async () => {
     const input = [
       '# Shareable markdown',
       '',
@@ -14,11 +14,13 @@ describe('playground share payload', () => {
       ...Array.from({ length: 400 }, (_, index) => `- 第 ${index + 1} 行：你好，世界 ${index.toString(36)}`),
     ].join('\n')
     const legacyHash = `data=${compressToEncodedURIComponent(input)}`
-    const hash = createMarkdownHash(input)
+    const deflateHash = createMarkdownHash(input)
+    const hash = await createMarkdownHashAsync(input)
 
-    expect(hash.startsWith('data=z:')).toBe(true)
+    expect(hash.startsWith('data=br:')).toBe(true)
     expect(hash.length).toBeLessThan(legacyHash.length)
-    expect(decodeMarkdownHash(hash)).toBe(input)
+    expect(hash.length).toBeLessThan(deflateHash.length)
+    expect(await decodeMarkdownHashAsync(hash)).toBe(input)
   })
 
   it('continues to decode legacy raw and lz-string payloads', () => {

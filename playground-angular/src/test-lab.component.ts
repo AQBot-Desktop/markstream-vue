@@ -3,6 +3,7 @@ import type { TestLabFrameworkId, TestLabSampleId } from '../../playground-share
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, EventEmitter, Output, signal } from '@angular/core'
 import { MarkstreamAngularComponent } from 'markstream-angular'
+import { resolveMarkdownTextareaPaste } from '../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../playground-shared/testPageState'
 import { ThinkingNodeComponent } from './thinking-node.component'
@@ -145,6 +146,7 @@ function readTextInput(event: Event, fallback = '') {
                 placeholder="在这里粘贴 markdown..."
                 [value]="input()"
                 (input)="updateInput($event)"
+                (paste)="handleEditorPaste($event)"
               ></textarea>
 
               <footer class="workspace-card__foot">
@@ -238,6 +240,24 @@ export class TestLabComponent implements OnInit, OnDestroy {
   updateInput(event: Event) {
     this.stopStreamRender()
     this.input.set(readTextInput(event, this.input()))
+  }
+
+  handleEditorPaste(event: ClipboardEvent) {
+    const textarea = event.currentTarget
+    if (!(textarea instanceof HTMLTextAreaElement))
+      return
+
+    const pasted = event.clipboardData?.getData('text/plain') ?? ''
+    const next = resolveMarkdownTextareaPaste(textarea, pasted)
+    if (!next)
+      return
+
+    event.preventDefault()
+    textarea.value = next.nextValue
+    textarea.selectionStart = next.selectionStart
+    textarea.selectionEnd = next.selectionEnd
+    this.stopStreamRender()
+    this.input.set(next.nextValue)
   }
 
   updateStreamSpeed(event: Event) {

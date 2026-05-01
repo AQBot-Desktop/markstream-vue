@@ -4,12 +4,14 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import infographicIconUrl from '../../icon/infographic.svg?url'
+import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import Portal from '../Portal'
 import { getInfographic } from './infographic'
 
 interface InfographicBlockNodeProps {
   node: any
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   showHeader?: boolean
@@ -44,20 +46,33 @@ const copyText = ref(false)
 const isCollapsed = ref(false)
 const infographicContainer = ref<HTMLElement>()
 const showSource = ref(false)
-const containerHeight = ref<string>('360px')
 const isModalOpen = ref(false)
 const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
+const baseCode = computed(() => props.node.code)
+const maxPreviewHeight = computed(() => {
+  if (!props.maxHeight || props.maxHeight === 'none')
+    return null
+  return parsePositiveNumber(props.maxHeight)
+})
+const estimatedPreviewHeight = computed(() => {
+  return clampInfographicPreviewHeight(
+    parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateInfographicPreviewHeight(baseCode.value),
+    undefined,
+    maxPreviewHeight.value,
+  )
+})
+const containerHeight = ref<string>(`${estimatedPreviewHeight.value}px`)
 
 function resolveContainerHeight(actualHeight: number) {
   if (!props.maxHeight || props.maxHeight === 'none')
-    return `${actualHeight}px`
+    return `${Math.max(actualHeight, estimatedPreviewHeight.value)}px`
 
-  const maxHeight = Number.parseFloat(String(props.maxHeight))
-  if (!Number.isFinite(maxHeight))
-    return `${actualHeight}px`
+  const maxHeight = maxPreviewHeight.value
+  if (maxHeight == null)
+    return `${Math.max(actualHeight, estimatedPreviewHeight.value)}px`
 
-  return `${Math.min(actualHeight, maxHeight)}px`
+  return `${Math.max(Math.min(actualHeight, maxHeight), estimatedPreviewHeight.value)}px`
 }
 
 function updateContainerHeight() {
@@ -76,7 +91,16 @@ const translateY = ref(0)
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 
-const baseCode = computed(() => props.node.code)
+watch(
+  estimatedPreviewHeight,
+  (height) => {
+    if (showSource.value || isCollapsed.value)
+      return
+    const currentHeight = parsePositiveNumber(containerHeight.value)
+    if (currentHeight == null || currentHeight < height)
+      containerHeight.value = `${height}px`
+  },
+)
 
 // Tooltip helpers
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
@@ -436,6 +460,8 @@ watch(
 
 <template>
   <div
+    data-markstream-infographic="1"
+    :data-markstream-mode="showSource ? 'source' : infographicInstance ? 'preview' : 'pending'"
     class="my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[
       props.isDark ? 'border-gray-700/30' : 'border-gray-200',
@@ -599,9 +625,9 @@ watch(
           </div>
         </div>
         <div
-          class="min-h-[360px] relative transition-all duration-100 overflow-hidden block"
+          class="infographic-preview min-h-[360px] relative transition-all duration-100 overflow-hidden block"
           :class="props.isDark ? 'bg-gray-900' : 'bg-gray-50'"
-          :style="{ height: containerHeight }"
+          :style="{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }"
           @mousedown="startDrag"
           @mousemove="onDrag"
           @mouseup="stopDrag"

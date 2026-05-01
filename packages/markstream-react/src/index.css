@@ -340,8 +340,6 @@ li .paragraph-node {
 }
 
 .table-node {
-  /* Use a stable layout to prevent column reflow jitter during streaming/typewriter updates. */
-  table-layout: fixed;
   width: 100%;
   border-collapse: collapse;
 }
@@ -351,6 +349,43 @@ li .paragraph-node {
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
+}
+
+.table-node thead th {
+  position: relative;
+}
+
+.table-node__resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 1;
+  width: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.table-node__resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0.35em;
+  bottom: 0.35em;
+  left: 50%;
+  width: 2px;
+  border-radius: 9999px;
+  background: rgba(94, 104, 121, 0.55);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.12s ease;
+}
+
+.table-node__resize-handle:hover::after,
+.table-node__resize-handle:focus-visible::after {
+  opacity: 1;
 }
 
 /* Override the default `break-words` / pre-wrap text styles inside tables so

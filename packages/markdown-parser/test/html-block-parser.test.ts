@@ -52,6 +52,33 @@ describe('html_block parser', () => {
     expect(c?.loading).toBe(false)
   })
 
+  it('does not let HTML comments absorb following Markdown blocks', () => {
+    const markdown = `<!-- 基础图片 -->
+![alt](https://example.com/a.png)
+
+## 标题
+
+---
+
+正文`
+
+    const md = getMarkdown('html-comment-followed-by-markdown')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'html_block',
+      'paragraph',
+      'heading',
+      'thematic_break',
+      'paragraph',
+    ])
+    expect(String(nodes[0]?.raw ?? '').trim()).toBe('<!-- 基础图片 -->')
+    expect(nodes[1]?.children?.[0]?.type).toBe('image')
+    expect(nodes[1]?.children?.[0]?.src).toBe('https://example.com/a.png')
+    expect(nodes[2]?.text).toBe('标题')
+    expect(nodes[4]?.children?.[0]?.content).toBe('正文')
+  })
+
   it('keeps outer same-tag html blocks loading until the matching outer close arrives', () => {
     const md = getMarkdown()
     const nodes = parseMarkdownToStructure('<div>outer<div>inner</div>rest', md, { final: false })

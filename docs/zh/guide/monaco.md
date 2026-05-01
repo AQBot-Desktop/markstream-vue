@@ -11,7 +11,7 @@ pnpm add stream-monaco
 提示：
 - 延迟初始化 Monaco（仅在可见或需要时才初始化）
 - 在生产构建中需要配置 worker 打包（使用 `vite-plugin-monaco-editor-esm`）
-- 如果需要更快的首次渲染，可使用 `getUseMonaco()` 在应用启动时预加载 Monaco
+- 如果需要更快的首次渲染，可使用 `preloadCodeBlockRuntime()` 在应用启动、空闲时间或路由进入前预加载代码块运行时
 - 不需要额外导入 CSS
 
 更多细节参见 `/zh/guide/monaco-internals`。
@@ -40,6 +40,20 @@ module.exports = {
 ### Webpack & MonacoWebpackPlugin
 
 如果你的项目使用 `monaco-editor-webpack-plugin` 来打包 Monaco，请让该插件通过 `globalThis.MonacoEnvironment` 接管 worker 的解析与路径。`markstream-vue` 在检测到 `MonacoEnvironment.getWorker/getWorkerUrl` 已存在时，不会再覆盖它们。
+
+### 预加载 Monaco
+
+为了避免首次代码块挂载时出现 cold-start fallback 闪烁，可以在应用初始化、空闲时间或进入含代码块的路由前预加载：
+
+```ts
+import { preloadCodeBlockRuntime } from 'markstream-vue'
+
+void preloadCodeBlockRuntime()
+```
+
+`preloadCodeBlockRuntime()` 会通过 markstream-vue 内部路径动态加载 `stream-monaco`、注册 Monaco workers，并标记代码块运行时已就绪。这样后续 `CodeBlockNode` 重新挂载时可以跳过 `<pre>` 加载 fallback。
+
+已有代码如果调用的是 `getUseMonaco()`，可以保持不变；它现在也会设置相同的 runtime-ready 状态，并继续返回已加载的 `stream-monaco` module 或 `null`。
 
 ### 添加更多语言与主题
 

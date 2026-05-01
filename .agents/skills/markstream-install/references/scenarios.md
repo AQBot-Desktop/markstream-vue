@@ -13,7 +13,7 @@
 
 | Feature | Peers |
 |---------|-------|
-| Lightweight highlighted code blocks | `shiki`, `stream-markdown` |
+| Lightweight highlighted code blocks | `stream-markdown` |
 | Monaco-powered code blocks | `stream-monaco` |
 | Mermaid | `mermaid` |
 | D2 | `@terrastruct/d2` |

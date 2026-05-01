@@ -118,6 +118,8 @@ export interface CodeBlockMonacoOptions {
   fontFamily?: string
   /** Tab width forwarded to Monaco. */
   tabSize?: number
+  /** Vertical padding forwarded to Monaco. */
+  padding?: { top?: number, bottom?: number }
   /** Render the Monaco editor in read-only mode. */
   readOnly?: boolean
   /** Monaco word-wrap mode for long lines. */
@@ -262,6 +264,7 @@ export interface PreCodeNodeProps {
 export interface MermaidBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   workerTimeoutMs?: number
@@ -322,6 +325,7 @@ export interface D2BlockNodeProps {
 export interface InfographicBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   showHeader?: boolean

@@ -70,6 +70,19 @@ export function parseLinkToken(
     loading = false
   }
 
+  const lastLinkToken = linkTokens[linkTokens.length - 1]
+  if (
+    (options as any)?.__insideStrong
+    && lastLinkToken?.type === 'text'
+    && String(lastLinkToken.content ?? '').endsWith('**')
+    && !linkTokens.some(token => token.type === 'strong_open')
+  ) {
+    const originalContent = String(lastLinkToken.content ?? '')
+    const originalRaw = String((lastLinkToken as any).raw ?? originalContent)
+    lastLinkToken.content = originalContent.slice(0, -2)
+    lastLinkToken.raw = originalRaw.replace(/\*\*$/, '')
+  }
+
   // Parse the collected tokens as inline content
   const children = parseInlineTokens(linkTokens, undefined, undefined, options as any)
   const linkText = children

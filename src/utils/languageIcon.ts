@@ -16,7 +16,9 @@ let userLanguageIconResolver: LanguageIconResolver | null = null
 export const languageIconsRevision = shallowRef(0)
 
 // Wire the registry to bump our revision ref
-_setRevisionBumper(() => { languageIconsRevision.value++ })
+_setRevisionBumper(() => {
+  languageIconsRevision.value++
+})
 
 // ── Default theme: Material Icon Theme ─────────────────────────────────
 

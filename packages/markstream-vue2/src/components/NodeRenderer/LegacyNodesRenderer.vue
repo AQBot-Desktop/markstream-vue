@@ -211,6 +211,10 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
+    const customForLanguage = lang ? (customComponents as any)[lang] : undefined
+    if (customForLanguage)
+      return customForLanguage
+
     if (lang === 'mermaid') {
       const customMermaid = (customComponents as any).mermaid
       return customMermaid || PreCodeNode

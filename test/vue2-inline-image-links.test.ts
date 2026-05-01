@@ -116,7 +116,13 @@ describe('markstream-vue2 paragraph media-only links', () => {
 
     const paragraph = wrapper.get('p.paragraph-node')
     const childTagNames = Array.from(paragraph.element.children).map(child => child.tagName)
+    const meaningfulNodes = Array.from(paragraph.element.childNodes).filter((node) => {
+      return node.nodeType !== Node.TEXT_NODE || node.textContent === ' '
+    })
     expect(childTagNames).toEqual(['A', 'A'])
+    expect(meaningfulNodes).toHaveLength(3)
+    expect(meaningfulNodes[1]?.nodeType).toBe(Node.TEXT_NODE)
+    expect(meaningfulNodes[1]?.textContent).toBe(' ')
     expect(paragraph.findAll('.text-node')).toHaveLength(0)
     expect(paragraph.findAll('a.link-node')).toHaveLength(2)
   })

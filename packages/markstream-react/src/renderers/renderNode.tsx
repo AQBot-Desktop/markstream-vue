@@ -20,6 +20,7 @@ import { HighlightNode } from '../components/HighlightNode/HighlightNode'
 import { HtmlBlockNode } from '../components/HtmlBlockNode/HtmlBlockNode'
 import { HtmlInlineNode } from '../components/HtmlInlineNode/HtmlInlineNode'
 import { ImageNode } from '../components/ImageNode/ImageNode'
+import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber as parsePositiveInfographicNumber } from '../components/InfographicBlockNode/height'
 import { InfographicBlockNode } from '../components/InfographicBlockNode/InfographicBlockNode'
 import { InlineCodeNode } from '../components/InlineCodeNode/InlineCodeNode'
 import { InsertNode } from '../components/InsertNode/InsertNode'
@@ -28,6 +29,7 @@ import { ListItemNode } from '../components/ListItemNode/ListItemNode'
 import { ListNode } from '../components/ListNode/ListNode'
 import { MathBlockNode } from '../components/MathBlockNode/MathBlockNode'
 import { MathInlineNode } from '../components/MathInlineNode/MathInlineNode'
+import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber as parsePositiveMermaidNumber } from '../components/MermaidBlockNode/height'
 import { MermaidBlockNode } from '../components/MermaidBlockNode/MermaidBlockNode'
 import { FallbackComponent } from '../components/NodeRenderer/FallbackComponent'
 import { ParagraphNode } from '../components/ParagraphNode/ParagraphNode'
@@ -41,8 +43,60 @@ import { TextNode } from '../components/TextNode/TextNode'
 import { ThematicBreakNode } from '../components/ThematicBreakNode/ThematicBreakNode'
 import { VmrContainerNode } from '../components/VmrContainerNode/VmrContainerNode'
 import { getCustomNodeComponents } from '../customComponents'
+import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { renderNodeChildren } from './renderChildren'
+
+function getRawCodeBlockLanguage(node: any) {
+  const trimmed = String(node?.language || '').trim()
+  if (!trimmed)
+    return ''
+  const [firstToken] = trimmed.split(/\s+/)
+  const [base] = firstToken.split(':')
+  return base.toLowerCase()
+}
+
+function renderCustomCodeBlockComponent(
+  component: any,
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+) {
+  return React.createElement(component, {
+    key,
+    node,
+    customId: ctx.customId,
+    isDark: ctx.isDark,
+    ctx,
+    renderNode,
+    indexKey: key,
+    typewriter: ctx.typewriter,
+  })
+}
+
+function getMermaidRenderProps(node: any, ctx: RenderContext) {
+  const next = { ...(ctx.mermaidProps || {}) } as Record<string, any>
+  if (parsePositiveMermaidNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampMermaidPreviewHeight(
+      estimateMermaidPreviewHeight(String(node?.code ?? '')),
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveMermaidNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
+}
+
+function getInfographicRenderProps(node: any, ctx: RenderContext) {
+  const next = { ...(ctx.infographicProps || {}) } as Record<string, any>
+  if (parsePositiveInfographicNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampInfographicPreviewHeight(
+      estimateInfographicPreviewHeight(String(node?.code ?? '')),
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveInfographicNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
+}
 
 function renderCodeBlock(
   node: any,
@@ -50,11 +104,14 @@ function renderCodeBlock(
   ctx: RenderContext,
   customComponents: Record<string, any>,
 ) {
-  const language = normalizeLanguageIdentifier(String(node.language || ''))
+  const rawLanguage = getRawCodeBlockLanguage(node)
+  const language = normalizeLanguageIdentifier(rawLanguage)
+  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
   if (language === 'mermaid') {
-    const customMermaid = customComponents.mermaid
+    const mermaidProps = getMermaidRenderProps(node, ctx)
+    const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid)
-      return React.createElement(customMermaid as any, { key, node, isDark: ctx.isDark, ...(ctx.mermaidProps || {}) })
+      return React.createElement(customMermaid as any, { key, node, isDark: ctx.isDark, ...mermaidProps })
     if (!ctx.renderCodeBlocksAsPre) {
       return (
         <MermaidBlockNode
@@ -62,16 +119,17 @@ function renderCodeBlock(
           node={node as any}
           isDark={ctx.isDark}
           loading={Boolean(node.loading)}
-          {...(ctx.mermaidProps || {})}
+          {...mermaidProps}
         />
       )
     }
   }
 
   if (language === 'infographic') {
-    const customInfographic = customComponents.infographic
+    const infographicProps = getInfographicRenderProps(node, ctx)
+    const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic)
-      return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark, ...(ctx.infographicProps || {}) })
+      return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark, ...infographicProps })
 
     return (
       <InfographicBlockNode
@@ -79,13 +137,13 @@ function renderCodeBlock(
         node={node as any}
         isDark={ctx.isDark}
         loading={Boolean(node.loading)}
-        {...(ctx.infographicProps || {})}
+        {...infographicProps}
       />
     )
   }
 
   if (language === 'd2' || language === 'd2lang') {
-    const customD2 = customComponents.d2
+    const customD2 = customForLanguage || customComponents.d2
     if (customD2)
       return React.createElement(customD2 as any, { key, node, isDark: ctx.isDark, ...(ctx.d2Props || {}) })
 
@@ -99,6 +157,13 @@ function renderCodeBlock(
       />
     )
   }
+
+  if (customForLanguage)
+    return renderCustomCodeBlockComponent(customForLanguage, node, key, ctx)
+
+  const customCodeBlock = customComponents.code_block
+  if (customCodeBlock)
+    return renderCustomCodeBlockComponent(customCodeBlock, node, key, ctx)
 
   if (ctx.renderCodeBlocksAsPre || language === 'mermaid') {
     return <PreCodeNode key={key} node={node} />
@@ -125,7 +190,9 @@ function renderCodeBlock(
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
-  const custom = (customComponents as Record<string, any>)[node.type]
+  const custom = node.type === 'code_block'
+    ? null
+    : (customComponents as Record<string, any>)[node.type]
   if (custom) {
     return React.createElement(custom, {
       key,
@@ -140,12 +207,12 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const tag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const fallbackTag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
+    const tag = resolvedCustomTag?.tag ?? fallbackTag
     if (tag) {
-      const customForTag = (customComponents as Record<string, any>)[tag]
-      // Check if tag is whitelisted in customHtmlTags
-      const customHtmlTags = ctx.customHtmlTags ?? []
-      const isWhitelisted = customHtmlTags.some((t: string) => t.toLowerCase() === tag)
+      const customForTag = resolvedCustomTag?.component ?? (customComponents as Record<string, any>)[tag]
+      const isWhitelisted = resolvedCustomTag?.isWhitelisted ?? (ctx.customHtmlTags ?? []).some((t: string) => t.toLowerCase() === tag)
       if (isWhitelisted && customForTag) {
         const coerced = {
           ...(node as any),
@@ -290,7 +357,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'html_block':
     case 'html_inline':
       return node.type === 'html_block'
-        ? <HtmlBlockNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
+        ? <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} customId={ctx.customId} />
         : <HtmlInlineNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'vmr_container':
       return <VmrContainerNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />

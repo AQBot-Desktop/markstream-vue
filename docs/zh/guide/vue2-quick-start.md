@@ -159,7 +159,7 @@ export default defineComponent({
 安装依赖：
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 ```
 
 ```vue

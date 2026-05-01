@@ -20,6 +20,7 @@ const defaultMap: Record<string, string> = {
   'common.source': 'Source',
   'common.export': 'Export',
   'common.open': 'Open',
+  'common.minimize': 'Minimize',
   'common.zoomIn': 'Zoom in',
   'common.zoomOut': 'Zoom out',
   'common.resetZoom': 'Reset zoom',
@@ -29,11 +30,30 @@ const defaultMap: Record<string, string> = {
 }
 
 /**
- * Replace the entire default translation map.
+ * Replace default fallback translations.
  * Consumers can call this to provide their own fallback translations (e.g. Chinese).
  */
-export function setDefaultI18nMap(map: Record<keyof typeof defaultMap, string>) {
+export function setDefaultI18nMap(map: Partial<Record<keyof typeof defaultMap, string>>) {
   Object.assign(defaultMap, map)
+}
+
+interface Translator {
+  t: (key: string) => string
+  te?: (key: string) => boolean
+}
+
+const fallbackT = (key: string) => defaultMap[key] ?? humanizeKey(key)
+
+function withFallback(translator: Translator) {
+  return {
+    t(key: string) {
+      if (translator.te && defaultMap[key] && !translator.te(key))
+        return fallbackT(key)
+
+      const translated = translator.t(key)
+      return translated === key && defaultMap[key] ? fallbackT(key) : translated
+    },
+  }
 }
 
 export function useSafeI18n() {
@@ -49,16 +69,16 @@ export function useSafeI18n() {
       try {
         const i18n = possible()
         if (i18n && typeof i18n.t === 'function') {
-          return { t: (i18n.t as any).bind(i18n) }
+          return withFallback({
+            t: (i18n.t as any).bind(i18n),
+            te: typeof i18n.te === 'function' ? (i18n.te as any).bind(i18n) : undefined,
+          })
         }
       }
       catch {}
     }
   }
   catch {}
-
-  // Fallback synchronous translator
-  const fallbackT = (key: string) => defaultMap[key] ?? humanizeKey(key)
 
   // Vue 2 build: avoid dynamic importing vue-i18n to prevent bundling Vue 3-only builds.
   // Consumers can still register a global `$vueI18nUse` hook to provide translations.

@@ -58,6 +58,76 @@ describe('asterisk masking literals', () => {
     expect(textIncludes(nodes, '必须完成')).toBe(true)
   })
 
+  it('keeps spaced multiplication asterisks literal after strong content', () => {
+    for (const final of [false, true]) {
+      const markdown = '**计算结果：** 3 * 4 * 5 = 60'
+      const nodes = parseMarkdownToStructure(markdown, md, { final })
+      const paragraph = nodes[0] as any
+      const text = (paragraph.children ?? [])
+        .filter((child: any) => child.type === 'text')
+        .map((child: any) => child.content)
+        .join('')
+
+      expect(collect(nodes as any, 'strong').length).toBe(1)
+      expect(collect(nodes as any, 'emphasis').length).toBe(0)
+      expect(text).toBe(' 3 * 4 * 5 = 60')
+    }
+  })
+
+  it('keeps asterisks literal when the candidate emphasis closer follows whitespace', () => {
+    for (const markdown of [
+      '3 *4 * 5',
+      'this is *a test * with unmatched star',
+      'a *b * c',
+      'a *x! * b',
+    ]) {
+      const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+
+      expect(collect(nodes as any, 'emphasis').length).toBe(0)
+      expect(textIncludes(nodes, markdown)).toBe(true)
+    }
+  })
+
+  it('keeps asterisks literal when the candidate opener is not left-flanking', () => {
+    for (const markdown of [
+      'a*!x* b',
+      'a*(x)* b',
+    ]) {
+      const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+
+      expect(collect(nodes as any, 'emphasis').length).toBe(0)
+      expect(textIncludes(nodes, markdown)).toBe(true)
+    }
+  })
+
+  it('still parses emphasis after skipping an invalid earlier closer', () => {
+    const nodes = parseInlineTokens([{ type: 'text', content: '*a * b*' }] as any[], '*a * b*', undefined, { final: true })
+
+    expect(collect(nodes as any, 'emphasis').length).toBe(1)
+    expect(textIncludes(nodes, 'a * b')).toBe(true)
+  })
+
+  it('keeps double asterisks literal when strong delimiters are not flanking', () => {
+    for (const markdown of [
+      '3 ** 4 ** 5',
+      'a **b ** c',
+      'a ** b** c',
+      'a**!x** b',
+    ]) {
+      const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+
+      expect(collect(nodes as any, 'strong').length).toBe(0)
+      expect(textIncludes(nodes, markdown)).toBe(true)
+    }
+  })
+
+  it('still parses strong after skipping an invalid earlier strong closer', () => {
+    const nodes = parseInlineTokens([{ type: 'text', content: '**a ** b**' }] as any[], '**a ** b**', undefined, { final: true })
+
+    expect(collect(nodes as any, 'strong').length).toBe(1)
+    expect(textIncludes(nodes, 'a ** b')).toBe(true)
+  })
+
   it('keeps literal intraword asterisks in link text while parsing normal strong outside link', () => {
     const markdown = '公司：[某某***科技有限公司]()，状态：**正常**'
     const nodes = parseMarkdownToStructure(markdown, md)

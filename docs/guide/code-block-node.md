@@ -5,7 +5,7 @@
 ## Quick summary
 - Monaco mode (install `stream-monaco`) — editor-like rendering with workers
 - Fallback — plain `<pre><code>` when `stream-monaco` is not installed
-- If you want Shiki-based highlighting (no Monaco), use `MarkdownCodeBlockNode` (peers: `shiki` + `stream-markdown`)
+- If you want Shiki-based highlighting (no Monaco), use `MarkdownCodeBlockNode` (peer: `stream-markdown`)
 
 ## Props
 Refer to `src/types/component-props.ts` for full signature. Key props:

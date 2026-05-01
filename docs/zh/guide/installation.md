@@ -22,7 +22,7 @@ yarn add markstream-vue
 
 | 能力 | 需要的包 | 适用场景 |
 |------|---------|---------|
-| 轻量高亮代码块 | `shiki`, `stream-markdown` | 文档站、SSR、包体积敏感场景 |
+| 轻量高亮代码块 | `stream-markdown` | 文档站、SSR、包体积敏感场景 |
 | Monaco 代码块 | `stream-monaco` | 需要复制、预览、展开、字体控制等完整代码块体验 |
 | Mermaid 图表 | `mermaid` | 渲染 `mermaid` fenced code block |
 | D2 图表 | `@terrastruct/d2` | 渲染 `d2` / `d2lang` fenced code block |
@@ -33,7 +33,7 @@ yarn add markstream-vue
 ### 文档站 / SSR 优先
 
 ```bash
-pnpm add markstream-vue shiki stream-markdown
+pnpm add markstream-vue stream-markdown
 ```
 
 如果你接下来要做的是文档站、内容站或 VitePress 主题，继续看 [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration)。
@@ -55,7 +55,7 @@ pnpm add markstream-vue mermaid @terrastruct/d2 katex
 ### 一次性全开
 
 ```bash
-pnpm add markstream-vue shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ## 4. CSS 顺序和安装同样重要

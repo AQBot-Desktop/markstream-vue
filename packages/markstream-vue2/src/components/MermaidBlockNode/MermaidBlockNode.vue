@@ -6,6 +6,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIconUrl from '../../icon/mermaid.svg?url'
+import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
@@ -15,6 +16,7 @@ import { getMermaid } from './mermaid'
 interface MermaidBlockNodeProps {
   node: any
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   workerTimeoutMs?: number
@@ -296,6 +298,18 @@ const baseFixedCode = computed(() => {
     .replace(/\]::([^:])/g, ']:::$1') // 将 :: 更改为 ::: 来应用类样式
     .replace(/:::subgraphNode$/gm, '::subgraphNode')
 })
+const maxPreviewHeight = computed(() => {
+  if (!props.maxHeight || props.maxHeight === 'none')
+    return null
+  return parsePositiveNumber(props.maxHeight)
+})
+const estimatedPreviewHeight = computed(() => {
+  return clampMermaidPreviewHeight(
+    parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(baseFixedCode.value),
+    undefined,
+    maxPreviewHeight.value,
+  )
+})
 
 // get the code with the theme configuration
 function getCodeWithTheme(theme: 'light' | 'dark', code = baseFixedCode.value) {
@@ -325,7 +339,7 @@ const translateX = ref(0)
 const translateY = ref(0)
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
-const showSource = ref(false)
+const showSource = ref(typeof window === 'undefined')
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
@@ -395,8 +409,19 @@ function scheduleRenderRetry(delayMs = 600) {
   renderRetryTimer = (globalThis as any).setTimeout(run, safeDelay)
 }
 
-const containerHeight = ref<string>('360px') // 初始值与 min-h 保持一致
+const containerHeight = ref<string>(`${estimatedPreviewHeight.value}px`)
 let resizeObserver: ResizeObserver | null = null
+
+watch(
+  estimatedPreviewHeight,
+  (height) => {
+    if (showSource.value || isCollapsed.value)
+      return
+    const currentHeight = parsePositiveNumber(containerHeight.value)
+    if (currentHeight == null || currentHeight < height)
+      containerHeight.value = `${height}px`
+  },
+)
 
 // rendering state management
 const hasRenderedOnce = ref(false)
@@ -418,7 +443,7 @@ const savedTransformState = ref({
   zoom: 1,
   translateX: 0,
   translateY: 0,
-  containerHeight: '360px',
+  containerHeight: `${estimatedPreviewHeight.value}px`,
 })
 const wheelListeners = computed(() => (props.enableWheelZoom ? { wheel: handleWheel } : {}))
 
@@ -555,7 +580,7 @@ function renderErrorToContainer(error: unknown) {
   errorDiv.appendChild(errorSpan)
   clearElement(mermaidContent.value)
   mermaidContent.value.appendChild(errorDiv)
-  containerHeight.value = '360px'
+  containerHeight.value = `${estimatedPreviewHeight.value}px`
   hasRenderError.value = true
   // 在错误显示时，停止任何预览轮询，避免错误被覆盖
   stopPreviewPolling()
@@ -780,11 +805,7 @@ async function canParseOrPrefix(
 const isFullscreenDisabled = computed(() => showSource.value || isRendering.value || isCollapsed.value)
 
 function resolveMaxContainerHeight() {
-  if (!props.maxHeight || props.maxHeight === 'none')
-    return null
-
-  const maxHeight = Number.parseFloat(String(props.maxHeight))
-  return Number.isFinite(maxHeight) ? maxHeight : null
+  return maxPreviewHeight.value
 }
 
 /**
@@ -856,7 +877,7 @@ function updateContainerHeight(newContainerWidth?: number) {
     const maxHeight = resolveMaxContainerHeight()
     const newHeight = containerWidth * aspectRatio
     const resolvedHeight = maxHeight == null ? newHeight : Math.min(newHeight, maxHeight)
-    containerHeight.value = `${resolvedHeight}px`
+    containerHeight.value = `${props.maxHeight === 'none' ? resolvedHeight : Math.max(resolvedHeight, estimatedPreviewHeight.value)}px`
   }
 }
 
@@ -1823,6 +1844,8 @@ const computedButtonStyle = computed(() => {
 
 <template>
   <div
+    data-markstream-mermaid="1"
+    :data-markstream-mode="showSource ? 'source' : hasRenderedOnce ? 'preview' : 'pending'"
     class="my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[
       props.isDark ? 'border-gray-700/30' : 'border-gray-200',

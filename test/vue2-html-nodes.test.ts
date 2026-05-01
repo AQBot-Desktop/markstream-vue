@@ -9,6 +9,7 @@ import { defineComponent, h } from 'vue'
 import HtmlBlockNode from '../packages/markstream-vue2/src/components/HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../packages/markstream-vue2/src/components/HtmlInlineNode/HtmlInlineNode.vue'
 import { setCustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
+import { flushAll } from './setup/flush-all'
 
 // Mock custom components
 const TestComponent = defineComponent({
@@ -136,6 +137,30 @@ describe('vue 2 - HtmlBlockNode Custom Components Integration', () => {
     expect(wrapper.html()).toContain('Pure HTML')
   })
 
+  it('should sanitize raw HTML fallback content in blocks', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          content: '<div><img src="x" onerror="alert(1)"><a href="javascript:alert(1)" title="ok">Link</a><script>alert(1)</script></div>',
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+    const img = wrapper.find('img')
+    const link = wrapper.find('a')
+
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('onerror')).toBeUndefined()
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toBeUndefined()
+    expect(link.attributes('title')).toBe('ok')
+    expect(wrapper.html()).not.toContain('<script')
+    expect(wrapper.html()).not.toContain('alert(1)')
+  })
+
   it('should pass props correctly to custom components', () => {
     const wrapper = mount(HtmlBlockNode, {
       props: {
@@ -181,6 +206,95 @@ describe('vue 2 - HtmlBlockNode Custom Components Integration', () => {
 
     // Should show placeholder initially
     expect(wrapper.find('.html-block-node__placeholder').exists()).toBe(true)
+  })
+
+  it('should render structured markdown children inside standard html wrappers once', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'span',
+          content: '<span style="font-size: 12px;"></span>',
+          attrs: [['style', 'font-size: 12px;']],
+          children: [
+            {
+              type: 'list',
+              raw: '',
+              ordered: false,
+              items: [
+                {
+                  type: 'list_item',
+                  raw: '',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: '',
+                      children: [{ type: 'text', raw: '', content: 'alpha' }],
+                    },
+                  ],
+                },
+                {
+                  type: 'list_item',
+                  raw: '',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: '',
+                      children: [{ type: 'text', raw: '', content: 'beta' }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+
+    const root = wrapper.find('.html-block-node')
+    expect(root.element.tagName).toBe('SPAN')
+    expect(root.attributes('style')).toContain('font-size: 12px;')
+    expect(wrapper.findAll('ul')).toHaveLength(1)
+    expect(wrapper.findAll('li')).toHaveLength(2)
+    expect((wrapper.text().match(/alpha/g) || []).length).toBe(1)
+    expect((wrapper.text().match(/beta/g) || []).length).toBe(1)
+  })
+
+  it('should sanitize dangerous attrs on structured wrapper roots', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'a',
+          content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+          attrs: [
+            ['href', 'javascript:alert(1)'],
+            ['onclick', 'alert(1)'],
+            ['data-safe', 'ok'],
+          ],
+          children: [
+            {
+              type: 'paragraph',
+              raw: '',
+              children: [{ type: 'text', raw: '', content: 'safe child' }],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+
+    const root = wrapper.find('.html-block-node')
+    expect(root.element.tagName).toBe('A')
+    expect(root.attributes('data-safe')).toBe('ok')
+    expect(root.attributes('href')).toBeUndefined()
+    expect(root.attributes('onclick')).toBeUndefined()
+    expect(wrapper.text()).toContain('safe child')
   })
 })
 
@@ -242,6 +356,30 @@ describe('vue 2 - HtmlInlineNode Custom Components Integration', () => {
 
     // HtmlInlineNode uses DOM manipulation, check that the container exists
     expect(wrapper.find('.html-inline-node').exists()).toBe(true)
+  })
+
+  it('should sanitize raw HTML fallback content inline', async () => {
+    const wrapper = mount(HtmlInlineNode, {
+      props: {
+        node: {
+          type: 'html_inline',
+          content: 'Before <img src="x" onerror="alert(1)"><a href="javascript:alert(1)" title="ok">Link</a> After',
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+    const img = wrapper.find('img')
+    const link = wrapper.find('a')
+
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('onerror')).toBeUndefined()
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toBeUndefined()
+    expect(link.attributes('title')).toBe('ok')
+    expect(wrapper.html()).not.toContain('alert(1)')
   })
 
   it('should handle mixed inline content', () => {

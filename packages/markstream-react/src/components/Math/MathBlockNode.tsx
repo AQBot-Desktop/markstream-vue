@@ -2,6 +2,7 @@ import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { MathBlockNodeProps } from '../../types/component-props'
 import { useEffect, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
+import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 import { getKatex } from './katex'
 
@@ -30,7 +31,7 @@ export function MathBlockNode({ node }: MathBlockNodeProps) {
   }, [registerViewport])
 
   useEffect(() => {
-    const content = node.content ?? ''
+    const content = normalizeKaTeXRenderInput(node.content ?? '')
     if (!content) {
       if (mathRef.current)
         mathRef.current.innerHTML = ''

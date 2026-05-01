@@ -1,7 +1,7 @@
 {
   "name": "markstream-angular",
   "type": "module",
-  "version": "0.0.2-beta.0",
+  "version": "0.0.2-beta.7",
   "description": "Experimental Angular Markdown renderer for Markstream, built on stream-markdown AST and a stable HTML baseline renderer.",
   "author": "Simon He",
   "license": "MIT",
@@ -55,7 +55,7 @@
     "@terrastruct/d2": ">=0.1.33",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
-    "stream-monaco": ">=0.0.22"
+    "stream-monaco": ">=0.0.40"
   },
   "peerDependenciesMeta": {
     "@antv/infographic": {

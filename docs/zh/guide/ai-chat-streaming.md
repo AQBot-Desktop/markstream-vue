@@ -13,7 +13,7 @@ description: 用 nodes 加 final 模式构建 AI 聊天与流式 Markdown 界面
 | 需求 | 安装包 | 适合场景 |
 | --- | --- | --- |
 | 纯文本或轻量聊天界面 | `markstream-vue` | 基础 Markdown、列表、链接、引用 |
-| 不用 Monaco 的代码高亮 | `markstream-vue shiki stream-markdown` | SSR 友好的聊天记录、较小 bundle |
+| 不用 Monaco 的代码高亮 | `markstream-vue stream-markdown` | SSR 友好的聊天记录、较小 bundle |
 | 更强的代码交互 | `markstream-vue stream-monaco` | 复制、预览、diff、Monaco 代码块 |
 | 聊天内容里有图表或公式 | `markstream-vue mermaid katex` | Mermaid 图表和 KaTeX 公式 |
 
@@ -63,7 +63,7 @@ const nodes = computed(() =>
 
 ### 更好的代码块
 
-- 想要更轻的文档风格：用 `MarkdownCodeBlockNode`，配 `shiki` + `stream-markdown`
+- 想要更轻的文档风格：用 `MarkdownCodeBlockNode`，配 `stream-markdown`
 - 想要更强的预览 / diff / 交互：用 `CodeBlockNode`，配 `stream-monaco`
 
 具体差异看 [渲染器与节点组件](/zh/guide/components)。

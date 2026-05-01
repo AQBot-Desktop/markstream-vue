@@ -1,14 +1,25 @@
 import type { NodeComponentProps } from '../../types/node-component'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
-import { tokenAttrsToProps } from '../../renderers/renderChildren'
-import { hasCustomHtmlComponents, parseHtmlToReactNodes } from '../../utils/htmlToReact'
+import { renderNodeChildren, tokenAttrsToProps } from '../../renderers/renderChildren'
+import { hasCustomHtmlComponents, normalizeDomAttrs, parseHtmlToReactNodes } from '../../utils/htmlToReact'
+
+function mergeHtmlBlockClassName(attrs?: Record<string, any>) {
+  const next = { ...(attrs || {}) }
+  const existing = typeof next.className === 'string' ? next.className.trim() : ''
+  next.className = existing ? `html-block-node ${existing}` : 'html-block-node'
+  return next
+}
 
 export function HtmlBlockNode(props: NodeComponentProps<{
   type: 'html_block'
   content: string
+  raw?: string
+  tag?: string
   attrs?: [string, string | null][] | null
+  children?: any[]
   loading?: boolean
 }> & {
   customComponents?: Record<string, React.ComponentType<any>>
@@ -70,7 +81,21 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       setRenderContent(node.content)
   }, [isDeferred, node.content, shouldRender])
 
-  const boundAttrs = useMemo(() => tokenAttrsToProps(node.attrs ?? undefined), [node.attrs])
+  const boundAttrs = useMemo(() => {
+    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined))
+    return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
+  }, [node.attrs])
+  const structuredTag = useMemo(() => String(node.tag ?? '').trim(), [node.tag])
+  const structuredChildren = useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
+  const isStructured = structuredChildren.length > 0
+    && !!structuredTag
+    && !NON_STRUCTURING_HTML_TAGS.has(structuredTag.toLowerCase())
+    && !!props.ctx
+    && !!props.renderNode
+  const structuredWrapperProps = useMemo(
+    () => mergeHtmlBlockClassName(boundAttrs as Record<string, any> | undefined),
+    [boundAttrs],
+  )
 
   // Check if we should use dynamic rendering
   const useDynamic = useMemo(() => {
@@ -82,6 +107,40 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       return null
     return parseHtmlToReactNodes(node.content, effectiveCustomComponents)
   }, [effectiveCustomComponents, node.content, useDynamic])
+  const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? ''), [renderContent])
+  const structuredContent = useMemo(() => {
+    if (!isStructured || !props.ctx || !props.renderNode)
+      return null
+    return renderNodeChildren(
+      structuredChildren,
+      props.ctx,
+      `${String(props.indexKey ?? 'html-block')}-structured`,
+      props.renderNode,
+    )
+  }, [isStructured, props.ctx, props.indexKey, props.renderNode, structuredChildren])
+
+  const placeholderNode = (
+    <div className="html-block-node__placeholder">
+      {placeholder ?? (
+        <>
+          <span className="html-block-node__placeholder-bar" />
+          <span className="html-block-node__placeholder-bar w-4/5" />
+          <span className="html-block-node__placeholder-bar w-2/3" />
+        </>
+      )}
+    </div>
+  )
+
+  if (isStructured) {
+    return React.createElement(
+      structuredTag,
+      {
+        ...(structuredWrapperProps as any),
+        ref: setHostEl,
+      },
+      shouldRender ? structuredContent : placeholderNode,
+    )
+  }
 
   return (
     <div ref={setHostEl} className="html-block-node" {...(boundAttrs as any)}>
@@ -92,20 +151,10 @@ export function HtmlBlockNode(props: NodeComponentProps<{
                   <>{reactNodes}</>
                 )
               : (
-                  <div dangerouslySetInnerHTML={{ __html: renderContent ?? '' }} />
+                  <div dangerouslySetInnerHTML={{ __html: safeHtmlContent }} />
                 )
           )
-        : (
-            <div className="html-block-node__placeholder">
-              {placeholder ?? (
-                <>
-                  <span className="html-block-node__placeholder-bar" />
-                  <span className="html-block-node__placeholder-bar w-4/5" />
-                  <span className="html-block-node__placeholder-bar w-2/3" />
-                </>
-              )}
-            </div>
-          )}
+        : placeholderNode}
     </div>
   )
 }

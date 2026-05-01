@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import type { MathBlockNodeProps } from '../../types/component-props'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
+import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
 import { getKatex, getKatexSync } from '../MathInlineNode/katex'
 
 const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
+const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
 
 function resolveInitialState() {
   if (!props.node.content) {
@@ -31,7 +33,7 @@ function resolveInitialState() {
 
   try {
     return {
-      html: katex.renderToString(props.node.content, {
+      html: katex.renderToString(mathContent.value, {
         throwOnError: props.node.loading,
         displayMode: true,
       }),
@@ -98,7 +100,7 @@ async function renderMath() {
   const abortController = new AbortController()
   currentAbortController = abortController
 
-  renderKaTeXWithBackpressure(props.node.content, true, {
+  renderKaTeXWithBackpressure(mathContent.value, true, {
     timeout: 3000,
     waitTimeout: 2000,
     maxRetries: 1,
@@ -135,7 +137,7 @@ async function renderMath() {
         const katex = await getKatex()
         if (katex) {
           try {
-            const html = katex.renderToString(props.node.content, {
+            const html = katex.renderToString(mathContent.value, {
               throwOnError: props.node.loading,
               displayMode: true,
             })
@@ -144,7 +146,7 @@ async function renderMath() {
             hasRenderedOnce = true
             renderingLoading.value = false
             // populate worker client cache so future calls hit cache
-            setKaTeXCache(props.node.content, true, html)
+            setKaTeXCache(mathContent.value, true, html)
           }
           catch {
           }

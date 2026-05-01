@@ -6,10 +6,11 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIcon from '../../icon/mermaid.svg?raw'
+import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiagramKind, parsePositiveNumber } from '../../utils/diagramHeight'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
-import { getMermaid } from './mermaid'
+import { getMermaid, isMermaidEnabled } from './mermaid'
 
 const props = withDefaults(
   // 全屏按钮禁用状态
@@ -51,7 +52,8 @@ const DOMPURIFY_CONFIG = {
   SAFE_FOR_TEMPLATES: true,
 } as const
 
-const mermaidAvailable = ref(false)
+const mermaidInitiallyEnabled = typeof window !== 'undefined' && isMermaidEnabled()
+const mermaidAvailable = ref(mermaidInitiallyEnabled)
 const mermaidSecurityLevel = computed(() => props.isStrict ? 'strict' : 'loose')
 const mermaidInitConfig = computed(() => ({
   startOnLoad: false,
@@ -260,15 +262,23 @@ function getCodeWithTheme(theme: 'light' | 'dark', code = baseFixedCode.value) {
   return themeConfig + baseCode
 }
 
-function getMermaidDiagramKind(code: string) {
-  for (const rawLine of code.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('%%'))
-      continue
-    const match = line.match(/^([A-Z][\w-]*)\b/i)
-    return match?.[1]?.toLowerCase() || ''
-  }
-  return ''
+function resolveMinContainerHeight() {
+  const raw = mermaidContainer.value
+    ? getComputedStyle(mermaidContainer.value).getPropertyValue('--ms-size-diagram-min-height').trim()
+    : ''
+  return parsePositiveNumber(raw) ?? 360
+}
+
+function clampPreviewHeight(height: number) {
+  const minHeight = resolveMinContainerHeight()
+  const maxHeight = resolveMaxContainerHeight()
+  return clampMermaidPreviewHeight(height, minHeight, maxHeight)
+}
+
+function resolveInitialContainerHeight() {
+  return `${clampPreviewHeight(
+    parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(baseFixedCode.value),
+  )}px`
 }
 
 // Zoom state
@@ -277,7 +287,7 @@ const translateX = ref(0)
 const translateY = ref(0)
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
-const showSource = ref(true)
+const showSource = ref(!mermaidInitiallyEnabled)
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
@@ -348,7 +358,7 @@ function scheduleRenderRetry(delayMs = 600) {
   renderRetryTimer = (globalThis as any).setTimeout(run, safeDelay)
 }
 
-const containerHeight = ref<string>('360px') // 初始值与 min-h 保持一致
+const containerHeight = ref<string>(resolveInitialContainerHeight())
 let resizeObserver: ResizeObserver | null = null
 
 // rendering state management
@@ -371,7 +381,7 @@ const savedTransformState = ref({
   zoom: 1,
   translateX: 0,
   translateY: 0,
-  containerHeight: '360px',
+  containerHeight: containerHeight.value,
 })
 const wheelListeners = computed(() => (props.enableWheelZoom ? { wheel: handleWheel } : {}))
 
@@ -752,7 +762,8 @@ function resolveMaxContainerHeight() {
   // Explicit prop value takes priority
   if (props.maxHeight != null) {
     const maxHeight = Number.parseFloat(String(props.maxHeight))
-    if (Number.isFinite(maxHeight)) return maxHeight
+    if (Number.isFinite(maxHeight))
+      return maxHeight
   }
 
   // Fall back to CSS token (respects density theming)
@@ -760,7 +771,8 @@ function resolveMaxContainerHeight() {
   if (el) {
     const raw = getComputedStyle(el).getPropertyValue('--ms-size-code-max-height').trim()
     const num = Number.parseFloat(raw)
-    if (Number.isFinite(num)) return num
+    if (Number.isFinite(num))
+      return num
   }
   return 500 // ultimate fallback
 }
@@ -1811,6 +1823,14 @@ watch(
 )
 
 watch(
+  [() => props.estimatedPreviewHeightPx, () => baseFixedCode.value],
+  () => {
+    if (!hasRenderedOnce.value && !showSource.value)
+      containerHeight.value = resolveInitialContainerHeight()
+  },
+)
+
+watch(
   () => viewportReady.value,
   (visible) => {
     if (!visible)
@@ -1883,13 +1903,13 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
     :class="[
-      { 'is-rendering': props.loading, dark: props.isDark },
+      { 'is-rendering': props.loading, 'dark': props.isDark },
     ]"
   >
     <!-- 重新设计的头部区域 -->
     <div
       v-if="props.showHeader"
-      class="mermaid-block-header flex justify-between items-center border-b"
+      class="mermaid-block-header flex items-center justify-between border-b px-[var(--ms-inset-panel-x)] py-[var(--ms-inset-panel-y)]"
     >
       <!-- 左侧插槽（允许完全接管左侧显示） -->
       <div v-if="$slots['header-left']">

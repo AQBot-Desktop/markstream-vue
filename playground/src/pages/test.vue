@@ -10,8 +10,9 @@ import { Icon } from '@iconify/vue'
 import { useDebounceFn, useLocalStorage, useResizeObserver } from '@vueuse/core'
 import { createDrauu } from 'drauu'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { resolveMarkdownTextareaPaste } from '../../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
-import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
+import { buildTestPageHref, buildTestPageHrefAsync, decodeMarkdownHashAsync, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
   normalizeSandboxSource,
@@ -30,6 +31,7 @@ import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
+import LabSelect from '../components/LabSelect.vue'
 import ThinkingNode from '../components/ThinkingNode.vue'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../composables/streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../composables/useStreamSimulator'
@@ -143,9 +145,26 @@ const ANNOTATION_ALIGN_OPTIONS = [
   { id: 'bottom', label: '底对齐', shortLabel: '底齐' },
 ] as const satisfies ReadonlyArray<{ id: AnnotationAlignMode, label: string, shortLabel: string }>
 const ANNOTATION_SHORTCUT_HINT = 'Shift+A 标注 / V Cursor'
+const STREAM_TRANSPORT_OPTIONS = [
+  { value: 'readable-stream', label: 'ReadableStream' },
+  { value: 'scheduler', label: 'Scheduler' },
+] as const satisfies ReadonlyArray<{ value: StreamTransportMode, label: string }>
+const STREAM_SLICE_OPTIONS = [
+  { value: 'pure-random', label: 'Pure Random' },
+  { value: 'boundary-aware', label: 'Boundary Aware' },
+] as const satisfies ReadonlyArray<{ value: StreamSliceMode, label: string }>
+const RENDER_MODE_OPTIONS = [
+  { value: 'monaco', label: 'Monaco' },
+  { value: 'markdown', label: 'MarkdownCodeBlock' },
+  { value: 'pre', label: 'PreCodeNode' },
+] as const satisfies ReadonlyArray<{ value: 'monaco' | 'markdown' | 'pre', label: string }>
 
 const frameworkCards = TEST_LAB_FRAMEWORKS
 const sampleCards = TEST_LAB_SAMPLES
+const sandboxFrameworkOptions = testSandboxFrameworks.map(framework => ({
+  value: framework.id,
+  label: framework.label,
+})) as ReadonlyArray<{ value: SandboxFrameworkId, label: string }>
 
 const diffHideUnchangedRegions = {
   enabled: true,
@@ -153,6 +172,12 @@ const diffHideUnchangedRegions = {
   minimumLineCount: 4,
   revealLineCount: 5,
 } as const
+
+function resolveInitialDarkMode() {
+  return typeof document !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : false
+}
 
 const testPageMonacoOptions = {
   renderSideBySide: false,
@@ -175,7 +200,7 @@ const streamBurstiness = useLocalStorage<number>('vmr-test-stream-burstiness', 3
 const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-test-stream-transport-mode', 'readable-stream')
 const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-test-stream-slice-mode', 'pure-random')
 const streamDebug = useLocalStorage<boolean>('vmr-test-stream-debug', false)
-const isDark = useLocalStorage<boolean>('vmr-test-dark', false)
+const isDark = useLocalStorage<boolean>('vmr-test-dark', resolveInitialDarkMode())
 
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
 const codeBlockStream = useLocalStorage<boolean>('vmr-test-code-stream', true)
@@ -229,6 +254,16 @@ let initialAnnotationSnapshot: AnnotationSnapshot | null = null
 let preserveAnnotationsOnNextInputChange = false
 
 const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
+const streamPresetOptions = computed(() => [
+  ...STREAM_PRESETS.map(preset => ({
+    value: preset.id,
+    label: preset.label,
+  })),
+  {
+    value: CUSTOM_STREAM_PRESET_ID,
+    label: 'Custom',
+  },
+])
 const normalizedChunkSizeRange = computed(() => normalizeStreamRange(
   Number(streamChunkSizeMin.value),
   Number(streamChunkSizeMax.value),
@@ -313,8 +348,9 @@ const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
-const labShareUsesLocalStorage = computed(() => buildTestPageHref('/test', input.value, 'lab').length > MAX_URL_LEN)
-const previewShareUsesLocalStorage = computed(() => buildTestPageHref('/test', input.value, 'preview').length > MAX_URL_LEN)
+const labShareUsesLocalStorage = ref(false)
+const previewShareUsesLocalStorage = ref(false)
+let shareModeHintRequestId = 0
 const previewShareButtonLabel = computed(() => {
   if (isSharePreviewMode.value)
     return '复制当前分享链接'
@@ -543,8 +579,34 @@ function focusEditorSoon() {
   })
 }
 
-function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent?: boolean } = {}) {
-  const full = buildTestPageHref(basePageUrl(), input.value, viewMode)
+async function resolveShareUsesLocalStorage(markdown: string, viewMode: TestPageViewMode) {
+  if (buildTestPageHref('/test', markdown, viewMode).length <= MAX_URL_LEN)
+    return false
+
+  return (await buildTestPageHrefAsync('/test', markdown, viewMode)).length > MAX_URL_LEN
+}
+
+async function refreshShareModeHints() {
+  const requestId = ++shareModeHintRequestId
+  const markdown = input.value
+  const [labUsesStorage, previewUsesStorage] = await Promise.all([
+    resolveShareUsesLocalStorage(markdown, 'lab'),
+    resolveShareUsesLocalStorage(markdown, 'preview'),
+  ])
+
+  if (requestId !== shareModeHintRequestId || markdown !== input.value)
+    return
+
+  labShareUsesLocalStorage.value = labUsesStorage
+  previewShareUsesLocalStorage.value = previewUsesStorage
+}
+
+const refreshShareModeHintsDebounced = useDebounceFn(() => {
+  void refreshShareModeHints()
+}, 240)
+
+async function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent?: boolean } = {}) {
+  const full = await buildTestPageHrefAsync(basePageUrl(), input.value, viewMode)
   issueUrl.value = buildIssueUrl(input.value)
   if (full.length > MAX_URL_LEN) {
     const localHref = buildLocalShareHref(
@@ -552,12 +614,20 @@ function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent
       viewMode,
     )
     shareUrl.value = localHref
+    if (viewMode === 'lab')
+      labShareUsesLocalStorage.value = true
+    else
+      previewShareUsesLocalStorage.value = true
     if (!options.silent)
       showToast('当前内容太长，已切换为本地分享链接；只能在你当前浏览器打开，分享给别人不会生效。', 'info', 4200)
     return localHref
   }
 
   shareUrl.value = full
+  if (viewMode === 'lab')
+    labShareUsesLocalStorage.value = false
+  else
+    previewShareUsesLocalStorage.value = false
   return full
 }
 
@@ -582,7 +652,7 @@ function showToast(message: string, type: 'success' | 'error' | 'info' = 'succes
 async function generateAndCopy() {
   isWorking.value = true
   copiedShareTarget.value = null
-  const target = generateShareLink('lab')
+  const target = await generateShareLink('lab')
 
   if (!target) {
     isWorking.value = false
@@ -606,7 +676,7 @@ async function generateAndCopy() {
 async function generateAndCopyPreview() {
   isWorking.value = true
   copiedShareTarget.value = null
-  const target = generateShareLink('preview')
+  const target = await generateShareLink('preview')
 
   if (!target) {
     isWorking.value = false
@@ -1600,17 +1670,19 @@ function findSelectableAnnotationAtStagePoint(point: { x: number, y: number }, o
   }
 
   const drawNodes = [...getAnnotationDrawNodes()].reverse()
-  const drawTargets = drawNodes.map((node) => {
+  const drawTargets: Array<{ kind: 'draw', id: string, shape: 'arrow' | 'rect' | 'ellipse' }> = []
+
+  for (const node of drawNodes) {
     const shape = inferDrawAnnotationKind(node)
     if (!isSelectableDrawAnnotationKind(shape) || !node.dataset.annotationId)
-      return null
+      continue
 
-    return {
+    drawTargets.push({
       kind: 'draw',
       id: node.dataset.annotationId,
       shape,
-    } satisfies AnnotationSelectionTarget
-  }).filter((target): target is AnnotationSelectionTarget => Boolean(target))
+    })
+  }
 
   for (const target of drawTargets) {
     if (options.excludeSelected && isAnnotationTargetSelected(target))
@@ -2235,6 +2307,26 @@ function annotationTextLines(content: string) {
   return content.split('\n')
 }
 
+function handleEditorPaste(event: ClipboardEvent) {
+  const textarea = event.currentTarget
+  if (!(textarea instanceof HTMLTextAreaElement))
+    return
+
+  const pasted = event.clipboardData?.getData('text/plain')
+  if (!pasted)
+    return
+
+  const next = resolveMarkdownTextareaPaste(textarea, pasted)
+  if (!next)
+    return
+
+  event.preventDefault()
+  textarea.value = next.nextValue
+  textarea.selectionStart = next.selectionStart
+  textarea.selectionEnd = next.selectionEnd
+  input.value = next.nextValue
+}
+
 function exportPreviewAsPdf() {
   if (annotationTextDraft.value?.content.trim())
     commitTextAnnotationDraft()
@@ -2245,8 +2337,8 @@ function exportPreviewAsPdf() {
   window.print()
 }
 
-function restoreFromUrl() {
-  const decoded = decodeMarkdownHash(window.location.hash || '')
+async function restoreFromUrl() {
+  const decoded = await decodeMarkdownHashAsync(window.location.hash || '')
   if (!decoded)
     return false
 
@@ -2273,16 +2365,16 @@ function restoreViewModeFromUrl() {
   testPageViewMode.value = resolveTestPageViewMode(window.location.search)
 }
 
-function exitSharedPreview() {
+async function exitSharedPreview() {
   testPageViewMode.value = 'lab'
-  const full = generateShareLink('lab', { silent: true })
+  const full = await generateShareLink('lab', { silent: true })
   shareUrl.value = full
   window.history.replaceState(undefined, '', full)
 }
 
 async function returnToEditableTestPage() {
   if (isSharePreviewMode.value) {
-    exitSharedPreview()
+    await exitSharedPreview()
     focusEditorSoon()
     return
   }
@@ -2358,9 +2450,9 @@ function frameworkHref(id: FrameworkId) {
   )
 }
 
-onMounted(() => {
+async function initializeTestPage() {
   restoreViewModeFromUrl()
-  const restored = restoreFromLocalShare() || restoreFromUrl()
+  const restored = restoreFromLocalShare() || await restoreFromUrl()
   if (!restored) {
     const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
     input.value = sample.content
@@ -2388,6 +2480,11 @@ onMounted(() => {
   window.addEventListener('pointerup', onAnnotationSelectionPointerUp, { passive: false })
   window.addEventListener('pointercancel', onAnnotationSelectionPointerUp, { passive: false })
   window.addEventListener('keydown', onAnnotationShortcutKeydown)
+  void refreshShareModeHints()
+}
+
+onMounted(() => {
+  void initializeTestPage()
 })
 
 onBeforeUnmount(() => {
@@ -2436,6 +2533,7 @@ watch(input, (value, previousValue) => {
   copiedShareTarget.value = null
   if (!isStreaming.value && typeof window !== 'undefined')
     shareUrl.value = currentBasePageUrl()
+  refreshShareModeHintsDebounced()
   if (sandboxAutoSync.value)
     syncSandboxDebounced()
   persistAnnotationCacheDebounced()
@@ -2516,6 +2614,11 @@ watch(annotationTextItems, () => {
     syncAnnotationSelectionBoxSoon()
 }, { deep: true })
 
+watch(isDark, (value) => {
+  if (typeof document !== 'undefined')
+    document.documentElement.classList.toggle('dark', value)
+}, { immediate: true })
+
 watch(() => renderMode.value, (mode) => {
   if (mode === 'pre')
     setCustomComponents({ code_block: PreCodeNode, think: ThinkingNode, thinking: ThinkingNode })
@@ -2542,17 +2645,21 @@ watch(mermaidEnabled, (enabled) => {
 
 <template>
   <div class="test-lab" :class="{ 'test-lab--dark': isDark, 'dark': isDark, 'test-lab--share-preview': isSharePreviewMode }">
-    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--cyan" />
-    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--amber" />
+    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--1" />
+    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--2" />
+    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--3" />
 
     <div class="test-lab__shell" :class="{ 'test-lab__shell--share-preview': isSharePreviewMode }">
       <section v-if="!isSharePreviewMode" class="hero-panel">
         <div class="hero-panel__copy">
-          <span class="eyebrow">Cross-framework regression lab</span>
-          <h1>Markstream Test Page</h1>
+          <span class="eyebrow">
+            <span class="eyebrow__dot" />
+            Cross-framework Rendering Studio
+          </span>
+          <h1>Markstream <span class="hero-panel__accent">Diagnostic</span> Studio</h1>
           <p>
-            直接粘贴 markdown，即时预览渲染结果；需要排障时，再用同一份输入快速对照
-            Vue 3、Vue 2、React 和 Angular 的渲染行为。
+            直接粘贴 markdown，立即查看真实渲染；排障时用同一份输入并排比对
+            Vue 3、Vue 2、React 与 Angular 的差异表现。
           </p>
         </div>
 
@@ -2722,18 +2829,11 @@ watch(mermaidEnabled, (enabled) => {
             </div>
 
             <div class="control-stack control-stack--sandbox">
-              <label class="select-control">
-                <span>目标框架</span>
-                <select v-model="sandboxFrameworkId">
-                  <option
-                    v-for="framework in testSandboxFrameworks"
-                    :key="framework.id"
-                    :value="framework.id"
-                  >
-                    {{ framework.label }}
-                  </option>
-                </select>
-              </label>
+              <LabSelect
+                v-model="sandboxFrameworkId"
+                label="目标框架"
+                :options="sandboxFrameworkOptions"
+              />
               <label class="text-control">
                 <span>包版本</span>
                 <input
@@ -2821,23 +2921,40 @@ watch(mermaidEnabled, (enabled) => {
               <span class="mini-pill">Live editor</span>
             </header>
 
-            <textarea
-              v-model="input"
-              class="editor-textarea"
-              spellcheck="false"
-              placeholder="在这里粘贴你的复现 markdown..."
-            />
+            <div class="editor-shell">
+              <div class="editor-shell__toolbar">
+                <div class="editor-shell__title-group">
+                  <span class="editor-shell__traffic" />
+                  <span class="editor-shell__traffic" />
+                  <span class="editor-shell__traffic" />
+                  <strong class="editor-shell__filename">repro.md</strong>
+                </div>
+                <div class="editor-shell__meta">
+                  <span class="editor-shell__meta-item">{{ lineCount }} lines</span>
+                  <span class="editor-shell__meta-item">{{ charCount }} chars</span>
+                </div>
+              </div>
+
+              <textarea
+                v-model="input"
+                class="editor-textarea"
+                spellcheck="false"
+                placeholder="在这里粘贴你的复现 markdown..."
+                @paste="handleEditorPaste"
+              />
+            </div>
 
             <footer class="workspace-card__foot">
               <span>可直接粘贴 issue 复现内容</span>
-              <span>{{ charCount }} chars</span>
+              <span>{{ lineCount }} lines · {{ charCount }} chars</span>
             </footer>
           </article>
 
           <article
             ref="previewCardRef"
             class="workspace-card workspace-card--pane workspace-card--preview"
-            :class="{ 'workspace-card--share-preview': isSharePreviewMode }"
+            :class="{ 'workspace-card--share-preview': isSharePreviewMode, 'workspace-card--preview-dark': isDark, 'dark': isDark }"
+            :data-color-scheme="isDark ? 'dark' : 'light'"
             :data-testid="isSharePreviewMode ? 'shared-preview-shell' : undefined"
           >
             <div
@@ -3009,206 +3126,209 @@ watch(mermaidEnabled, (enabled) => {
             </header>
 
             <div class="preview-surface">
-              <div ref="previewStageRef" class="preview-stage">
-                <MarkdownRender
-                  :content="previewContent"
-                  :custom-html-tags="testPageCustomHtmlTags"
-                  :is-dark="isDark"
-                  :mermaid-props="previewMermaidProps"
-                  :d2-props="previewD2Props"
-                  :infographic-props="previewInfographicProps"
-                  :viewport-priority="viewportPriority"
-                  :batch-rendering="batchRendering"
-                  :typewriter="typewriter"
-                  :code-block-stream="codeBlockStream"
-                  code-block-dark-theme="vitesse-dark"
-                  code-block-light-theme="vitesse-light"
-                  :code-block-monaco-options="testPageMonacoOptions"
-                  :parse-options="previewParseOptions"
-                />
+              <div class="preview-surface__grid" />
+              <div class="preview-stage-frame">
+                <div ref="previewStageRef" class="preview-stage">
+                  <MarkdownRender
+                    :content="previewContent"
+                    :custom-html-tags="testPageCustomHtmlTags"
+                    :is-dark="isDark"
+                    :mermaid-props="previewMermaidProps"
+                    :d2-props="previewD2Props"
+                    :infographic-props="previewInfographicProps"
+                    :viewport-priority="viewportPriority"
+                    :batch-rendering="batchRendering"
+                    :typewriter="typewriter"
+                    :code-block-stream="codeBlockStream"
+                    code-block-dark-theme="vitesse-dark"
+                    code-block-light-theme="vitesse-light"
+                    :code-block-monaco-options="testPageMonacoOptions"
+                    :parse-options="previewParseOptions"
+                  />
 
-                <div
-                  class="preview-annotation-layer"
-                  :class="{ 'preview-annotation-layer--visible': annotationOverlayVisible }"
-                >
-                  <svg
-                    ref="annotationDrawSvgRef"
-                    class="preview-annotation-layer__svg preview-annotation-layer__svg--draw"
-                    :class="{
-                      'preview-annotation-layer__svg--interactive': annotationDrawInteractive,
-                      'preview-annotation-layer__svg--selectable': annotationDrawSelectable,
-                    }"
-                    @pointerdown.capture="startDrawSelection"
-                  />
                   <div
-                    v-if="annotationTextInteractive"
-                    class="preview-annotation-layer__text-hitarea"
-                    @pointerdown="startTextAnnotation"
-                  />
-                  <svg
-                    class="preview-annotation-layer__svg preview-annotation-layer__svg--text"
-                    :viewBox="`0 0 ${annotationStageWidth || 1} ${annotationStageHeight || 1}`"
-                    :width="annotationStageWidth || 1"
-                    :height="annotationStageHeight || 1"
+                    class="preview-annotation-layer"
+                    :class="{ 'preview-annotation-layer--visible': annotationOverlayVisible }"
                   >
-                    <g
-                      v-for="annotationText in annotationTextItems"
-                      :key="annotationText.id"
-                      class="preview-annotation-text-item"
-                      :data-annotation-id="annotationText.id"
+                    <svg
+                      ref="annotationDrawSvgRef"
+                      class="preview-annotation-layer__svg preview-annotation-layer__svg--draw"
                       :class="{
-                        'preview-annotation-text-item--interactive': annotationTextLayerInteractive,
-                        'preview-annotation-text-item--dragging': annotationSelectionTransform?.targets.some(target => target.kind === 'text' && target.id === annotationText.id),
+                        'preview-annotation-layer__svg--interactive': annotationDrawInteractive,
+                        'preview-annotation-layer__svg--selectable': annotationDrawSelectable,
                       }"
-                      @pointerdown="startTextSelection(annotationText, $event)"
-                      @dblclick="editTextAnnotation(annotationText, $event)"
-                    >
-                      <text
-                        :x="annotationText.x"
-                        :y="annotationText.y"
-                        :fill="annotationText.color"
-                        :font-size="annotationText.fontSize"
-                        font-weight="700"
-                        :stroke="annotationTextOutline"
-                        stroke-linejoin="round"
-                        paint-order="stroke"
-                        stroke-width="8"
-                      >
-                        <tspan
-                          v-for="(line, index) in annotationTextLines(annotationText.content)"
-                          :key="`${annotationText.id}-${index}`"
-                          :x="annotationText.x"
-                          :dy="index === 0 ? 0 : annotationText.fontSize * 1.35"
-                        >
-                          {{ line }}
-                        </tspan>
-                      </text>
-                    </g>
-                  </svg>
-
-                  <div
-                    v-if="annotationSelectionVisible"
-                    class="preview-annotation-selection"
-                  >
+                      @pointerdown.capture="startDrawSelection"
+                    />
                     <div
-                      v-if="annotationSelectionBox && !annotationSingleArrowSelection"
-                      class="preview-annotation-selection__frame"
-                      :style="annotationSelectionFrameStyle()"
-                      @pointerdown="startSelectedAnnotationMove"
-                      @dblclick.stop="editSelectedTextAnnotation($event)"
+                      v-if="annotationTextInteractive"
+                      class="preview-annotation-layer__text-hitarea"
+                      @pointerdown="startTextAnnotation"
+                    />
+                    <svg
+                      class="preview-annotation-layer__svg preview-annotation-layer__svg--text"
+                      :viewBox="`0 0 ${annotationStageWidth || 1} ${annotationStageHeight || 1}`"
+                      :width="annotationStageWidth || 1"
+                      :height="annotationStageHeight || 1"
                     >
-                      <template v-if="annotationSelectionCanResize">
+                      <g
+                        v-for="annotationText in annotationTextItems"
+                        :key="annotationText.id"
+                        class="preview-annotation-text-item"
+                        :data-annotation-id="annotationText.id"
+                        :class="{
+                          'preview-annotation-text-item--interactive': annotationTextLayerInteractive,
+                          'preview-annotation-text-item--dragging': annotationSelectionTransform?.targets.some(target => target.kind === 'text' && target.id === annotationText.id),
+                        }"
+                        @pointerdown="startTextSelection(annotationText, $event)"
+                        @dblclick="editTextAnnotation(annotationText, $event)"
+                      >
+                        <text
+                          :x="annotationText.x"
+                          :y="annotationText.y"
+                          :fill="annotationText.color"
+                          :font-size="annotationText.fontSize"
+                          font-weight="700"
+                          :stroke="annotationTextOutline"
+                          stroke-linejoin="round"
+                          paint-order="stroke"
+                          stroke-width="8"
+                        >
+                          <tspan
+                            v-for="(line, index) in annotationTextLines(annotationText.content)"
+                            :key="`${annotationText.id}-${index}`"
+                            :x="annotationText.x"
+                            :dy="index === 0 ? 0 : annotationText.fontSize * 1.35"
+                          >
+                            {{ line }}
+                          </tspan>
+                        </text>
+                      </g>
+                    </svg>
+
+                    <div
+                      v-if="annotationSelectionVisible"
+                      class="preview-annotation-selection"
+                    >
+                      <div
+                        v-if="annotationSelectionBox && !annotationSingleArrowSelection"
+                        class="preview-annotation-selection__frame"
+                        :style="annotationSelectionFrameStyle()"
+                        @pointerdown="startSelectedAnnotationMove"
+                        @dblclick.stop="editSelectedTextAnnotation($event)"
+                      >
+                        <template v-if="annotationSelectionCanResize">
+                          <button
+                            v-for="handle in ANNOTATION_RESIZE_HANDLES"
+                            :key="handle"
+                            type="button"
+                            class="preview-annotation-selection__handle"
+                            :class="`preview-annotation-selection__handle--${handle}`"
+                            :style="annotationResizeHandleStyle(handle)"
+                            @pointerdown="startSelectedAnnotationResize(handle, $event)"
+                          />
+                        </template>
+                      </div>
+
+                      <template v-else-if="annotationArrowSelectionLine">
+                        <div
+                          class="preview-annotation-selection__arrow"
+                          :style="annotationArrowSelectionStyle"
+                        />
                         <button
-                          v-for="handle in ANNOTATION_RESIZE_HANDLES"
-                          :key="handle"
                           type="button"
-                          class="preview-annotation-selection__handle"
-                          :class="`preview-annotation-selection__handle--${handle}`"
-                          :style="annotationResizeHandleStyle(handle)"
-                          @pointerdown="startSelectedAnnotationResize(handle, $event)"
+                          class="preview-annotation-selection__handle preview-annotation-selection__handle--arrow"
+                          :style="annotationArrowHandleStyle('start')"
+                          @pointerdown="startSelectedArrowHandle('start', $event)"
+                        />
+                        <button
+                          type="button"
+                          class="preview-annotation-selection__handle preview-annotation-selection__handle--arrow"
+                          :style="annotationArrowHandleStyle('end')"
+                          @pointerdown="startSelectedArrowHandle('end', $event)"
                         />
                       </template>
-                    </div>
 
-                    <template v-else-if="annotationArrowSelectionLine">
                       <div
-                        class="preview-annotation-selection__arrow"
-                        :style="annotationArrowSelectionStyle"
-                      />
-                      <button
-                        type="button"
-                        class="preview-annotation-selection__handle preview-annotation-selection__handle--arrow"
-                        :style="annotationArrowHandleStyle('start')"
-                        @pointerdown="startSelectedArrowHandle('start', $event)"
-                      />
-                      <button
-                        type="button"
-                        class="preview-annotation-selection__handle preview-annotation-selection__handle--arrow"
-                        :style="annotationArrowHandleStyle('end')"
-                        @pointerdown="startSelectedArrowHandle('end', $event)"
-                      />
-                    </template>
+                        v-if="annotationSelectionActionsVisible"
+                        class="preview-annotation-selection__actions"
+                        :style="annotationSelectionActionsStyle()"
+                        @pointerdown.stop
+                      >
+                        <div v-if="annotationCanAlign" class="preview-annotation-selection__action-group">
+                          <button
+                            v-for="alignOption in ANNOTATION_ALIGN_OPTIONS"
+                            :key="alignOption.id"
+                            type="button"
+                            class="preview-annotation-selection__action"
+                            :title="alignOption.label"
+                            @click.stop="alignSelectedAnnotations(alignOption.id)"
+                          >
+                            {{ alignOption.shortLabel }}
+                          </button>
+                        </div>
+                        <div class="preview-annotation-selection__action-group">
+                          <button
+                            type="button"
+                            class="preview-annotation-selection__action"
+                            @click.stop="bringSelectedAnnotationToFront"
+                          >
+                            置顶
+                          </button>
+                          <button
+                            type="button"
+                            class="preview-annotation-selection__action"
+                            @click.stop="duplicateSelectedAnnotation"
+                          >
+                            复制
+                          </button>
+                          <button
+                            type="button"
+                            class="preview-annotation-selection__action preview-annotation-selection__action--danger"
+                            @click.stop="deleteSelectedAnnotation"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
                     <div
-                      v-if="annotationSelectionActionsVisible"
-                      class="preview-annotation-selection__actions"
-                      :style="annotationSelectionActionsStyle()"
-                      @pointerdown.stop
+                      v-if="annotationTextDraft"
+                      class="preview-annotation-text-editor"
+                      :style="annotationTextEditorStyle()"
+                      @pointerdown.stop.prevent="suppressNextTextAnnotationPlacement()"
+                      @pointerup.stop.prevent
+                      @click.stop
                     >
-                      <div v-if="annotationCanAlign" class="preview-annotation-selection__action-group">
+                      <textarea
+                        ref="annotationTextInputRef"
+                        v-model="annotationTextDraft.content"
+                        class="preview-annotation-text-editor__input"
+                        :placeholder="annotationTextDraft.id ? '编辑标注文字' : '输入标注文字'"
+                        @keydown.esc.prevent="cancelTextAnnotationDraft"
+                        @keydown.meta.enter.prevent="commitTextAnnotationDraft"
+                        @keydown.ctrl.enter.prevent="commitTextAnnotationDraft"
+                      />
+                      <div class="preview-annotation-text-editor__actions">
                         <button
-                          v-for="alignOption in ANNOTATION_ALIGN_OPTIONS"
-                          :key="alignOption.id"
                           type="button"
-                          class="preview-annotation-selection__action"
-                          :title="alignOption.label"
-                          @click.stop="alignSelectedAnnotations(alignOption.id)"
+                          class="preview-annotation-chip"
+                          @pointerdown.stop.prevent="suppressNextTextAnnotationPlacement()"
+                          @pointerup.stop.prevent
+                          @click.stop.prevent="suppressNextTextAnnotationPlacement(); cancelTextAnnotationDraft()"
                         >
-                          {{ alignOption.shortLabel }}
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          class="preview-annotation-chip preview-annotation-chip--active"
+                          @pointerdown.stop.prevent="suppressNextTextAnnotationPlacement()"
+                          @pointerup.stop.prevent
+                          @click.stop.prevent="suppressNextTextAnnotationPlacement(); commitTextAnnotationDraft()"
+                        >
+                          {{ annotationTextDraft.id ? '保存文字' : '添加文字' }}
                         </button>
                       </div>
-                      <div class="preview-annotation-selection__action-group">
-                        <button
-                          type="button"
-                          class="preview-annotation-selection__action"
-                          @click.stop="bringSelectedAnnotationToFront"
-                        >
-                          置顶
-                        </button>
-                        <button
-                          type="button"
-                          class="preview-annotation-selection__action"
-                          @click.stop="duplicateSelectedAnnotation"
-                        >
-                          复制
-                        </button>
-                        <button
-                          type="button"
-                          class="preview-annotation-selection__action preview-annotation-selection__action--danger"
-                          @click.stop="deleteSelectedAnnotation"
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    v-if="annotationTextDraft"
-                    class="preview-annotation-text-editor"
-                    :style="annotationTextEditorStyle()"
-                    @pointerdown.stop.prevent="suppressNextTextAnnotationPlacement()"
-                    @pointerup.stop.prevent
-                    @click.stop
-                  >
-                    <textarea
-                      ref="annotationTextInputRef"
-                      v-model="annotationTextDraft.content"
-                      class="preview-annotation-text-editor__input"
-                      :placeholder="annotationTextDraft.id ? '编辑标注文字' : '输入标注文字'"
-                      @keydown.esc.prevent="cancelTextAnnotationDraft"
-                      @keydown.meta.enter.prevent="commitTextAnnotationDraft"
-                      @keydown.ctrl.enter.prevent="commitTextAnnotationDraft"
-                    />
-                    <div class="preview-annotation-text-editor__actions">
-                      <button
-                        type="button"
-                        class="preview-annotation-chip"
-                        @pointerdown.stop.prevent="suppressNextTextAnnotationPlacement()"
-                        @pointerup.stop.prevent
-                        @click.stop.prevent="suppressNextTextAnnotationPlacement(); cancelTextAnnotationDraft()"
-                      >
-                        取消
-                      </button>
-                      <button
-                        type="button"
-                        class="preview-annotation-chip preview-annotation-chip--active"
-                        @pointerdown.stop.prevent="suppressNextTextAnnotationPlacement()"
-                        @pointerup.stop.prevent
-                        @click.stop.prevent="suppressNextTextAnnotationPlacement(); commitTextAnnotationDraft()"
-                      >
-                        {{ annotationTextDraft.id ? '保存文字' : '添加文字' }}
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -3285,41 +3405,23 @@ watch(mermaidEnabled, (enabled) => {
           </header>
 
           <div class="control-stack control-stack--stream">
-            <label class="select-control">
-              <span>Transport</span>
-              <select v-model="streamTransportMode">
-                <option value="readable-stream">
-                  ReadableStream
-                </option>
-                <option value="scheduler">
-                  Scheduler
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="streamTransportMode"
+              label="Transport"
+              :options="STREAM_TRANSPORT_OPTIONS"
+            />
 
-            <label class="select-control">
-              <span>Slice Mode</span>
-              <select v-model="streamSliceMode">
-                <option value="pure-random">
-                  Pure Random
-                </option>
-                <option value="boundary-aware">
-                  Boundary Aware
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="streamSliceMode"
+              label="Slice Mode"
+              :options="STREAM_SLICE_OPTIONS"
+            />
 
-            <label class="select-control">
-              <span>流式画像 preset</span>
-              <select v-model="selectedStreamPresetId">
-                <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
-                  {{ preset.label }}
-                </option>
-                <option :value="CUSTOM_STREAM_PRESET_ID">
-                  Custom
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="selectedStreamPresetId"
+              label="流式画像 preset"
+              :options="streamPresetOptions"
+            />
 
             <p class="control-note">
               {{ streamPresetDescription }}
@@ -3402,20 +3504,11 @@ watch(mermaidEnabled, (enabled) => {
               </label>
             </div>
 
-            <label class="select-control">
-              <span>代码块模式</span>
-              <select v-model="renderMode">
-                <option value="monaco">
-                  Monaco
-                </option>
-                <option value="markdown">
-                  MarkdownCodeBlock
-                </option>
-                <option value="pre">
-                  PreCodeNode
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="renderMode"
+              label="代码块模式"
+              :options="RENDER_MODE_OPTIONS"
+            />
           </div>
         </div>
       </dialog>
@@ -3424,56 +3517,119 @@ watch(mermaidEnabled, (enabled) => {
 </template>
 
 <style scoped>
+/* ═══════════════════════════════════════════════════════════
+   Test Lab — Redesigned UI
+   ═══════════════════════════════════════════════════════════ */
+
 .test-lab {
-  --lab-bg: #f4f7fb;
-  --lab-surface: rgba(255, 255, 255, 0.82);
-  --lab-surface-strong: rgba(255, 255, 255, 0.94);
-  --lab-border: rgba(15, 23, 42, 0.09);
-  --lab-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
-  --lab-text: #10203a;
-  --lab-muted: #59708f;
-  --lab-accent: #1d4ed8;
-  --lab-accent-soft: rgba(29, 78, 216, 0.12);
+  --lab-bg: #f5f7f6;
+  --lab-surface: rgba(255, 255, 255, 0.78);
+  --lab-surface-strong: rgba(255, 255, 255, 0.92);
+  --lab-border: rgba(15, 23, 42, 0.07);
+  --lab-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 24px 64px rgba(15, 23, 42, 0.08);
+  --lab-text: #0f172a;
+  --lab-muted: #64748b;
+  --lab-accent: #0f766e;
+  --lab-accent-soft: rgba(15, 118, 110, 0.12);
+  --lab-accent-gradient: linear-gradient(135deg, #0f766e, #0891b2);
+  --lab-radius: 20px;
+  --lab-radius-sm: 12px;
   --workspace-pane-height: clamp(540px, 72vh, 880px);
+  font-family: 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
   position: relative;
   min-height: 100vh;
-  padding: 28px 18px 42px;
+  padding: 24px 20px 48px;
   background:
-    radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 30%),
-    radial-gradient(circle at 85% 12%, rgba(251, 191, 36, 0.16), transparent 28%),
-    linear-gradient(180deg, #f8fbff 0%, var(--lab-bg) 100%);
+    radial-gradient(circle at 6% 8%, rgba(15, 118, 110, 0.12), transparent 42%),
+    radial-gradient(circle at 92% 84%, rgba(245, 158, 11, 0.1), transparent 46%),
+    var(--lab-bg);
   color: var(--lab-text);
+  color-scheme: light;
   overflow: hidden;
 }
 
 .test-lab--dark {
-  --lab-bg: #08111f;
-  --lab-surface: rgba(9, 18, 32, 0.82);
-  --lab-surface-strong: rgba(15, 23, 42, 0.94);
-  --lab-border: rgba(148, 163, 184, 0.14);
-  --lab-shadow: 0 28px 80px rgba(2, 6, 23, 0.45);
+  --lab-bg: #0b1120;
+  --lab-surface: rgba(15, 23, 42, 0.7);
+  --lab-surface-strong: rgba(15, 23, 42, 0.88);
+  --lab-border: rgba(148, 163, 184, 0.1);
+  --lab-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 24px 64px rgba(0, 0, 0, 0.3);
   --lab-text: #e2e8f0;
   --lab-muted: #94a3b8;
-  --lab-accent: #60a5fa;
-  --lab-accent-soft: rgba(96, 165, 250, 0.16);
+  --lab-accent: #22d3ee;
+  --lab-accent-soft: rgba(34, 211, 238, 0.14);
+  --lab-accent-gradient: linear-gradient(135deg, #0ea5e9, #14b8a6);
   color-scheme: dark;
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 30%),
-    radial-gradient(circle at 85% 12%, rgba(245, 158, 11, 0.12), transparent 28%),
-    linear-gradient(180deg, #0b1220 0%, var(--lab-bg) 100%);
+  background: var(--lab-bg);
+}
+
+.test-lab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: linear-gradient(rgba(15, 23, 42, 0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.022) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at 52% 34%, rgba(0, 0, 0, 0.95), transparent 82%);
+}
+
+.test-lab--dark::before {
+  opacity: 0.2;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.065) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.065) 1px, transparent 1px);
 }
 
 .test-lab--share-preview {
   padding: 0;
 }
 
+/* ─── Background Glows ─── */
+.test-lab__glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+}
+
+.test-lab__glow--1 {
+  top: -80px;
+  left: -60px;
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  opacity: 0.12;
+}
+
+.test-lab__glow--2 {
+  right: -40px;
+  bottom: 20%;
+  width: 350px;
+  height: 350px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  opacity: 0.1;
+}
+
+.test-lab__glow--3 {
+  top: 50%;
+  left: 40%;
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(135deg, #06b6d4, #0ea5e9);
+  opacity: 0.06;
+}
+
+.test-lab--dark .test-lab__glow--1 { opacity: 0.08; }
+.test-lab--dark .test-lab__glow--2 { opacity: 0.06; }
+.test-lab--dark .test-lab__glow--3 { opacity: 0.04; }
+
+/* ─── Shell ─── */
 .test-lab__shell {
   position: relative;
   z-index: 1;
   max-width: 1480px;
   margin: 0 auto;
   display: grid;
-  gap: 22px;
+  gap: 20px;
 }
 
 .test-lab__shell--share-preview {
@@ -3482,55 +3638,56 @@ watch(mermaidEnabled, (enabled) => {
   gap: 0;
 }
 
-.test-lab__glow {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(80px);
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.test-lab__glow--cyan {
-  top: 40px;
-  left: -80px;
-  width: 280px;
-  height: 280px;
-  background: rgba(34, 211, 238, 0.34);
-}
-
-.test-lab__glow--amber {
-  right: -60px;
-  bottom: 120px;
-  width: 260px;
-  height: 260px;
-  background: rgba(251, 191, 36, 0.28);
-}
-
+/* ─── Shared Card Chrome ─── */
 .hero-panel,
 .panel-card,
 .workspace-card {
   background: var(--lab-surface);
   border: 1px solid var(--lab-border);
-  border-radius: 28px;
+  border-radius: var(--lab-radius);
   box-shadow: var(--lab-shadow);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(16px) saturate(1.4);
 }
 
+/* ─── Hero Panel ─── */
 .hero-panel {
   position: relative;
   overflow: hidden;
-  padding: 20px 22px;
+  padding: 24px;
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  animation: panel-rise 0.42s ease both;
+}
+
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--lab-accent-gradient);
+  border-radius: var(--lab-radius) var(--lab-radius) 0 0;
 }
 
 .hero-panel::after {
   content: '';
   position: absolute;
-  inset: auto -12% -55% auto;
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgba(29, 78, 216, 0.12), transparent 68%);
+  inset: auto -10% -50% auto;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(15, 118, 110, 0.12), transparent 65%);
   pointer-events: none;
 }
 
@@ -3562,68 +3719,106 @@ watch(mermaidEnabled, (enabled) => {
   gap: 8px;
 }
 
+.hero-panel__accent {
+  background: var(--lab-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Eyebrow ─── */
 .eyebrow {
   display: inline-flex;
+  align-items: center;
+  gap: 8px;
   width: fit-content;
-  padding: 6px 10px;
+  padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(29, 78, 216, 0.14);
+  background: var(--lab-accent-soft);
+  border: 1px solid rgba(15, 118, 110, 0.2);
   color: var(--lab-accent);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
+.eyebrow__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lab-accent);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
 .test-lab--dark .eyebrow {
-  background: rgba(15, 23, 42, 0.84);
-  border-color: rgba(96, 165, 250, 0.22);
-  color: #93c5fd;
+  background: rgba(14, 165, 233, 0.14);
+  border-color: rgba(34, 211, 238, 0.24);
+  color: #67e8f9;
 }
 
 .hero-panel h1 {
   margin: 0;
-  font-size: clamp(1.72rem, 2.9vw, 2.45rem);
-  line-height: 1;
+  font-size: clamp(1.6rem, 2.8vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .hero-panel p {
   margin: 0;
   max-width: 720px;
   color: var(--lab-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.6;
 }
 
+/* ─── Metrics ─── */
 .hero-panel__metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .metric-card {
-  padding: 11px 14px;
-  border-radius: 18px;
+  padding: 12px 14px;
+  border-radius: var(--lab-radius-sm);
   background: var(--lab-surface-strong);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--lab-border);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(15, 118, 110, 0.1);
 }
 
 .metric-card span {
   display: block;
   color: var(--lab-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   margin-bottom: 4px;
 }
 
 .metric-card strong {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
+/* ─── Framework Switcher ─── */
 .framework-switcher {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .framework-chip {
@@ -3631,26 +3826,33 @@ watch(mermaidEnabled, (enabled) => {
   flex-direction: column;
   gap: 3px;
   padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.78);
+  border-radius: var(--lab-radius-sm);
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface-strong);
   color: inherit;
   text-decoration: none;
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: all 0.2s ease;
 }
 
 .framework-chip:hover {
   transform: translateY(-2px);
-  border-color: rgba(29, 78, 216, 0.28);
-  box-shadow: 0 16px 32px rgba(29, 78, 216, 0.1);
+  border-color: rgba(15, 118, 110, 0.3);
+  box-shadow: 0 12px 32px rgba(15, 118, 110, 0.12);
 }
 
 .framework-chip--current {
-  border-color: rgba(29, 78, 216, 0.28);
-  background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(34, 197, 94, 0.08));
+  border-color: rgba(15, 118, 110, 0.35);
+  background: var(--lab-accent-soft);
+}
+
+.framework-chip--current::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--lab-accent);
+  margin-bottom: 4px;
 }
 
 .test-lab--dark .metric-card,
@@ -3662,29 +3864,30 @@ watch(mermaidEnabled, (enabled) => {
 .test-lab--dark .text-control,
 .test-lab--dark .segmented-control__button,
 .test-lab--dark .preset-chip {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(148, 163, 184, 0.1);
 }
 
 .test-lab--dark .framework-chip--current,
 .test-lab--dark .sample-card--active,
 .test-lab--dark .segmented-control__button--active,
 .test-lab--dark .preset-chip--active {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(15, 23, 42, 0.92));
-  border-color: rgba(96, 165, 250, 0.3);
-  color: #bfdbfe;
+  background: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.3);
+  color: #67e8f9;
 }
 
 .framework-chip__label {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .framework-chip__note {
   color: var(--lab-muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
+/* ─── Layout ─── */
 .lab-layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -3703,7 +3906,7 @@ watch(mermaidEnabled, (enabled) => {
 .lab-sidebar,
 .workspace-grid {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .lab-sidebar {
@@ -3714,6 +3917,7 @@ watch(mermaidEnabled, (enabled) => {
   grid-area: workspace;
 }
 
+/* ─── Panel Cards ─── */
 .panel-card {
   padding: 20px;
 }
@@ -3736,7 +3940,8 @@ watch(mermaidEnabled, (enabled) => {
 .panel-card__head h2,
 .workspace-card__head h2 {
   margin: 0;
-  font-size: 1.08rem;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .panel-card__head p,
@@ -3747,71 +3952,90 @@ watch(mermaidEnabled, (enabled) => {
 .sample-card span {
   margin: 0;
   color: var(--lab-muted);
-  font-size: 0.92rem;
+  font-size: 0.86rem;
   line-height: 1.5;
 }
 
+/* ─── Mini Pill ─── */
 .mini-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.05);
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--lab-border);
   color: var(--lab-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
+  transition: all 0.18s ease;
 }
 
 .mini-pill--active {
-  background: rgba(29, 78, 216, 0.14);
+  background: var(--lab-accent-soft);
+  border-color: rgba(15, 118, 110, 0.24);
   color: var(--lab-accent);
 }
 
+.test-lab--dark .mini-pill {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(148, 163, 184, 0.1);
+  color: #cbd5e1;
+}
+
+.test-lab--dark .mini-pill--active {
+  background: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.26);
+  color: #67e8f9;
+}
+
+/* ─── Sample Cards ─── */
 .sample-list,
 .control-stack,
 .toggle-grid,
 .meta-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .sample-card {
   width: 100%;
   padding: 14px 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.72);
+  border-radius: var(--lab-radius-sm);
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface-strong);
   text-align: left;
   cursor: pointer;
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
+  transition: all 0.2s ease;
 }
 
 .sample-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.25);
+  box-shadow: 0 10px 26px rgba(15, 118, 110, 0.12);
 }
 
 .sample-card strong {
   display: block;
-  margin-bottom: 6px;
-  font-size: 0.98rem;
+  margin-bottom: 4px;
+  font-size: 0.92rem;
+  font-weight: 700;
 }
 
 .sample-card--active {
-  border-color: rgba(29, 78, 216, 0.28);
-  background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(255, 255, 255, 0.92));
+  border-color: rgba(15, 118, 110, 0.32);
+  background: var(--lab-accent-soft);
+  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.1);
 }
 
+/* ─── Action & Ghost Buttons ─── */
 .control-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .control-actions--stream-bar {
@@ -3819,24 +4043,24 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .control-actions--stacked {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .action-button,
 .ghost-button {
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--lab-radius-sm);
   cursor: pointer;
   font: inherit;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    background 0.18s ease;
+  font-weight: 600;
+  font-size: 0.84rem;
+  transition: all 0.18s ease;
 }
 
 .action-button {
-  padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.06);
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--lab-border);
   color: var(--lab-text);
 }
 
@@ -3846,72 +4070,82 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .action-button--primary {
-  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  background: var(--lab-accent-gradient);
+  border-color: transparent;
   color: #fff;
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.28);
+}
+
+.action-button--primary:hover {
+  box-shadow: 0 12px 32px rgba(15, 118, 110, 0.34);
 }
 
 .action-button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
   transform: none;
 }
 
 .ghost-button {
-  padding: 8px 12px;
-  background: rgba(15, 23, 42, 0.05);
+  padding: 7px 12px;
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid var(--lab-border);
   color: var(--lab-muted);
 }
 
 .test-lab--dark .action-button:not(.action-button--primary),
 .test-lab--dark .ghost-button {
-  background: rgba(30, 41, 59, 0.84);
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(148, 163, 184, 0.1);
   color: #cbd5e1;
 }
 
+/* ─── Progress ─── */
 .progress-block {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .progress-track {
   width: 100%;
-  height: 10px;
+  height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .test-lab--dark .progress-track {
-  background: rgba(51, 65, 85, 0.7);
+  background: rgba(51, 65, 85, 0.5);
 }
 
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #06b6d4, #1d4ed8);
+  background: var(--lab-accent-gradient);
+  transition: width 0.3s ease;
 }
 
 .progress-meta {
-  margin-top: 10px;
+  margin-top: 8px;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
+  font-size: 0.78rem;
 }
 
+/* ─── Form Controls ─── */
 .range-control,
 .select-control,
 .toggle-item {
   display: grid;
   gap: 8px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 10px 14px;
+  border-radius: var(--lab-radius-sm);
+  background: var(--lab-surface-strong);
+  border: 1px solid var(--lab-border);
 }
 
-.range-control span,
-.select-control span {
+.range-control span {
   color: var(--lab-muted);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .toggle-item {
@@ -3927,26 +4161,27 @@ watch(mermaidEnabled, (enabled) => {
   margin: 0;
   padding: 0 4px;
   color: var(--lab-muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   line-height: 1.6;
 }
 
+/* ─── Stream Summary ─── */
 .stream-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
-  border-radius: 18px;
+  gap: 8px;
+  margin-top: 14px;
+  border-radius: var(--lab-radius-sm);
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.64);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: var(--lab-surface-strong);
+  border: 1px solid var(--lab-border);
 }
 
 .stream-summary__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .stream-summary__row--dense {
@@ -3956,13 +4191,13 @@ watch(mermaidEnabled, (enabled) => {
 .stream-summary__item {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.05);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid var(--lab-border);
   color: var(--lab-muted);
-  font-size: 0.79rem;
+  font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -3970,93 +4205,171 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .stream-summary__item--active {
-  background: rgba(29, 78, 216, 0.12);
-  border-color: rgba(29, 78, 216, 0.2);
+  background: var(--lab-accent-soft);
+  border-color: rgba(15, 118, 110, 0.24);
   color: var(--lab-accent);
 }
 
-.select-control select {
-  border: 0;
-  border-radius: 14px;
-  padding: 11px 12px;
-  background: rgba(15, 23, 42, 0.05);
-  color: var(--lab-text);
-  font: inherit;
-}
-
+/* ─── Text Controls ─── */
 .text-control {
   display: grid;
   gap: 8px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 10px 14px;
+  border-radius: var(--lab-radius-sm);
+  background: var(--lab-surface-strong);
+  border: 1px solid var(--lab-border);
 }
 
 .text-control span {
   color: var(--lab-muted);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .text-control input {
-  border: 0;
-  border-radius: 14px;
-  padding: 11px 12px;
-  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--lab-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--lab-surface-strong);
   color: var(--lab-text);
   font: inherit;
+  font-size: 0.86rem;
 }
 
 .text-control input:focus {
   outline: none;
+  border-color: var(--lab-accent);
+  box-shadow: 0 0 0 3px var(--lab-accent-soft);
 }
 
-.test-lab--dark .select-control select,
 .test-lab--dark .text-control input {
-  background: rgba(30, 41, 59, 0.9);
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(148, 163, 184, 0.12);
   color: #e2e8f0;
 }
 
+/* ─── Segmented & Preset ─── */
 .segmented-control {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .segmented-control__button,
 .preset-chip {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface-strong);
   color: var(--lab-text);
-  border-radius: 16px;
+  border-radius: var(--lab-radius-sm);
   cursor: pointer;
   font: inherit;
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
+  font-weight: 600;
+  font-size: 0.84rem;
+  transition: all 0.18s ease;
 }
 
 .segmented-control__button {
-  padding: 11px 12px;
+  padding: 9px 12px;
 }
 
 .preset-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
+.preset-chip {
+  padding: 7px 12px;
+}
+
+.segmented-control__button:hover,
+.preset-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.24);
+}
+
+.segmented-control__button--active,
+.preset-chip--active {
+  border-color: rgba(15, 118, 110, 0.3);
+  background: var(--lab-accent-soft);
+  color: var(--lab-accent);
+}
+
+.segmented-control__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.toggle-item input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--lab-accent);
+}
+
+/* ─── Meta List ─── */
+.meta-list__row {
+  gap: 16px;
+}
+
+.meta-list__row strong {
+  display: inline-block;
+  max-width: 60%;
+  font-size: 0.82rem;
+  color: var(--lab-text);
+  line-break: anywhere;
+  text-align: right;
+}
+
+/* ─── Info Banners ─── */
+.info-banner {
+  padding: 10px 14px;
+  border-radius: var(--lab-radius-sm);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+.info-banner--success {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+.info-banner--error {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.info-banner--info {
+  background: rgba(15, 118, 110, 0.1);
+  border-color: rgba(15, 118, 110, 0.16);
+  color: var(--lab-accent);
+}
+
+.info-banner--warning {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.test-lab--dark .info-banner--success { color: #4ade80; }
+.test-lab--dark .info-banner--error { color: #f87171; }
+.test-lab--dark .info-banner--info { color: #a5b4fc; }
+.test-lab--dark .info-banner--info { color: #67e8f9; }
+.test-lab--dark .info-banner--warning { color: #fbbf24; }
+
+/* ─── Sandbox ─── */
 .sandbox-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .panel-card--sandbox {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .panel-card--sandbox .panel-card__head {
@@ -4071,12 +4384,11 @@ watch(mermaidEnabled, (enabled) => {
 .panel-card--sandbox .text-control,
 .panel-card--sandbox .toggle-item {
   padding: 10px 12px;
-  border-radius: 16px;
 }
 
 .panel-card--sandbox .segmented-control__button,
 .panel-card--sandbox .preset-chip {
-  border-radius: 14px;
+  border-radius: 10px;
 }
 
 .panel-card--sandbox .control-actions {
@@ -4088,115 +4400,39 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .panel-card--sandbox .meta-list__row {
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--lab-surface-strong);
+  border: 1px solid var(--lab-border);
 }
 
 .panel-card--sandbox .info-banner {
-  padding: 10px 12px;
-  font-size: 0.86rem;
-}
-
-.preset-chip {
   padding: 8px 12px;
+  font-size: 0.82rem;
 }
 
-.segmented-control__button:hover,
-.preset-chip:hover {
-  transform: translateY(-1px);
-}
-
-.segmented-control__button--active,
-.preset-chip--active {
-  border-color: rgba(29, 78, 216, 0.28);
-  background: rgba(29, 78, 216, 0.12);
-  color: var(--lab-accent);
-}
-
-.segmented-control__button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.toggle-item input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
-}
-
-.meta-list__row {
-  gap: 16px;
-}
-
-.meta-list__row strong {
-  display: inline-block;
-  max-width: 60%;
-  font-size: 0.84rem;
-  color: var(--lab-text);
-  line-break: anywhere;
-  text-align: right;
-}
-
-.info-banner {
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  font-size: 0.9rem;
-}
-
-.info-banner--success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
-}
-
-.info-banner--error {
-  background: rgba(220, 38, 38, 0.12);
-  color: #b91c1c;
-}
-
-.info-banner--info {
-  background: rgba(29, 78, 216, 0.1);
-  color: #1d4ed8;
-}
-
-.info-banner--warning {
-  background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
-}
-
-.test-lab--dark .mini-pill {
-  background: rgba(30, 41, 59, 0.9);
-  color: #cbd5e1;
-}
-
-.test-lab--dark .mini-pill--active {
-  background: rgba(37, 99, 235, 0.2);
-  color: #bfdbfe;
-}
-
+/* ─── Workspace Area ─── */
 .workspace-card__head-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   padding: 0;
+  border-radius: 10px;
 }
 
 .icon-button__icon {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .workspace-grid {
@@ -4236,7 +4472,7 @@ watch(mermaidEnabled, (enabled) => {
 
 .workspace-card--sandbox-preview .workspace-card__head,
 .workspace-card--sandbox-preview .workspace-card__foot {
-  padding: 16px 18px;
+  padding: 14px 18px;
 }
 
 .workspace-card--share-preview {
@@ -4248,8 +4484,14 @@ watch(mermaidEnabled, (enabled) => {
   border: 0;
   box-shadow: none;
   overflow: hidden;
+  color-scheme: light;
 }
 
+.workspace-card--share-preview.workspace-card--preview-dark {
+  color-scheme: dark;
+}
+
+/* ─── Immersive Preview Shell ─── */
 .preview-immersive-shell {
   position: absolute;
   bottom: 0;
@@ -4268,20 +4510,18 @@ watch(mermaidEnabled, (enabled) => {
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   max-width: 100%;
-  padding: 10px 12px;
-  border-radius: 28px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(18px);
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(20px) saturate(1.4);
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(8px);
   pointer-events: none;
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+  transition: all 0.2s ease;
 }
 
 .preview-immersive-toolbar__button {
@@ -4292,18 +4532,19 @@ watch(mermaidEnabled, (enabled) => {
   text-decoration: none;
 }
 
+/* ─── Annotation UI ─── */
 .preview-annotation-toolbar {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .preview-annotation-toolbar__hint {
-  padding: 0 12px;
+  padding: 0 10px;
   color: var(--lab-muted);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -4312,30 +4553,29 @@ watch(mermaidEnabled, (enabled) => {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .preview-annotation-toolbar__group--colors {
-  gap: 6px;
+  gap: 4px;
 }
 
 .preview-annotation-chip,
 .preview-annotation-swatch {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface-strong);
   color: var(--lab-text);
-  border-radius: 999px;
+  border-radius: 8px;
   cursor: pointer;
   font: inherit;
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: all 0.18s ease;
 }
 
 .preview-annotation-chip {
-  min-height: 38px;
-  padding: 0 12px;
+  min-height: 34px;
+  padding: 0 10px;
 }
 
 .preview-annotation-chip:hover,
@@ -4344,26 +4584,27 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .preview-annotation-chip--active {
-  border-color: rgba(29, 78, 216, 0.28);
-  background: rgba(29, 78, 216, 0.12);
+  border-color: rgba(15, 118, 110, 0.3);
+  background: var(--lab-accent-soft);
   color: var(--lab-accent);
 }
 
 .preview-annotation-chip:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
 }
 
 .preview-annotation-swatch {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
+  border-radius: 50%;
   background: var(--annotation-swatch);
 }
 
 .preview-annotation-swatch--active {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.86), 0 0 0 4px var(--annotation-swatch);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 4px var(--annotation-swatch);
 }
 
 .workspace-card--share-preview .preview-immersive-shell:hover .preview-immersive-toolbar,
@@ -4377,42 +4618,133 @@ watch(mermaidEnabled, (enabled) => {
   pointer-events: auto;
 }
 
+/* ─── Workspace Card Heads ─── */
 .workspace-card__head,
 .workspace-card__foot {
-  padding: 18px 20px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--lab-border);
 }
 
 .workspace-card__foot {
-  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  border-top: 1px solid var(--lab-border);
   border-bottom: 0;
 }
 
+.editor-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  padding: 14px;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 22%);
+}
+
+.editor-shell__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface-strong);
+}
+
+.editor-shell__title-group,
+.editor-shell__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.editor-shell__traffic {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  box-shadow: 12px 0 0 #22c55e, 24px 0 0 #0ea5e9;
+}
+
+.editor-shell__title-group .editor-shell__traffic + .editor-shell__traffic,
+.editor-shell__title-group .editor-shell__traffic + .editor-shell__traffic + .editor-shell__traffic {
+  display: none;
+}
+
+.editor-shell__filename {
+  margin-left: 28px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--lab-text);
+}
+
+.editor-shell__meta-item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--lab-border);
+  color: var(--lab-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Editor ─── */
 .editor-textarea {
   width: 100%;
-  min-height: 560px;
-  padding: 22px 20px;
-  border: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 20px;
+  border: 1px solid var(--lab-border);
+  border-radius: 18px;
   resize: none;
-  background:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.98));
-  color: #0f172a;
-  font:
-    500 0.95rem/1.7 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  background: linear-gradient(180deg, var(--lab-surface-strong), rgba(255, 255, 255, 0.82));
+  color: var(--lab-text);
+  font: 500 0.9rem/1.7 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
 .editor-textarea:focus {
   outline: none;
 }
 
+.editor-textarea::placeholder {
+  color: var(--lab-muted);
+  opacity: 0.6;
+}
+
+/* ─── Preview Surface ─── */
 .preview-surface {
   position: relative;
   min-height: 560px;
-  padding: 22px 20px;
+  padding: 20px;
   overflow: auto;
   box-sizing: border-box;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.92));
+  background: var(--lab-surface-strong);
+}
+
+.preview-surface__grid {
+  position: absolute;
+  inset: 20px;
+  border-radius: 20px;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(15, 23, 42, 0.028) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.028) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.12));
+}
+
+.preview-stage-frame {
+  position: relative;
+  min-height: 100%;
+  padding: clamp(18px, 2vw, 26px);
+  border-radius: 20px;
+  border: 1px solid var(--lab-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .preview-stage {
@@ -4420,6 +4752,7 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 100%;
 }
 
+/* ─── Annotation Layer ─── */
 .preview-annotation-layer {
   position: absolute;
   inset: 0;
@@ -4486,6 +4819,7 @@ watch(mermaidEnabled, (enabled) => {
   cursor: grabbing;
 }
 
+/* ─── Annotation Selection ─── */
 .preview-annotation-selection {
   position: absolute;
   inset: 0;
@@ -4495,10 +4829,10 @@ watch(mermaidEnabled, (enabled) => {
 
 .preview-annotation-selection__frame {
   position: absolute;
-  border: 2px dashed rgba(37, 99, 235, 0.7);
-  border-radius: 18px;
-  background: rgba(37, 99, 235, 0.08);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.82);
+  border: 2px dashed rgba(99, 102, 241, 0.6);
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.06);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
   pointer-events: auto;
   cursor: move;
 }
@@ -4507,21 +4841,21 @@ watch(mermaidEnabled, (enabled) => {
   position: absolute;
   height: 2px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.82);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.78);
+  background: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
   transform-origin: 0 50%;
 }
 
 .preview-annotation-selection__handle {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   padding: 0;
   appearance: none;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
-  background: #2563eb;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: var(--lab-accent);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
   transform: translate(-50%, -50%);
   pointer-events: auto;
 }
@@ -4546,13 +4880,13 @@ watch(mermaidEnabled, (enabled) => {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   max-width: min(344px, calc(100vw - 24px));
   padding: 6px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+  border: 1px solid var(--lab-border);
+  border-radius: 14px;
+  background: var(--lab-surface);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
   backdrop-filter: blur(16px);
   pointer-events: auto;
 }
@@ -4561,35 +4895,35 @@ watch(mermaidEnabled, (enabled) => {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .preview-annotation-selection__action {
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.05);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
   color: var(--lab-text);
   cursor: pointer;
   font: inherit;
-  transition:
-    transform 0.18s ease,
-    background 0.18s ease,
-    color 0.18s ease;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
 }
 
 .preview-annotation-selection__action:hover {
   transform: translateY(-1px);
-  background: rgba(29, 78, 216, 0.12);
+  background: var(--lab-accent-soft);
   color: var(--lab-accent);
 }
 
 .preview-annotation-selection__action--danger:hover {
-  background: rgba(220, 38, 38, 0.12);
+  background: rgba(220, 38, 38, 0.08);
   color: #dc2626;
 }
 
+/* ─── Annotation Text Editor ─── */
 .preview-annotation-text-editor {
   position: absolute;
   z-index: 7;
@@ -4598,22 +4932,21 @@ watch(mermaidEnabled, (enabled) => {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border-radius: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+  border-radius: 14px;
+  border: 1px solid var(--lab-border);
+  background: var(--lab-surface);
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(16px);
 }
 
 .preview-annotation-text-editor__input {
   width: 100%;
-  min-height: 88px;
+  min-height: 80px;
   border: 0;
   resize: none;
   background: transparent;
   color: var(--lab-text);
-  font:
-    600 0.92rem/1.5 "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  font: 600 0.88rem/1.5 "IBM Plex Sans", "Helvetica Neue", sans-serif;
 }
 
 .preview-annotation-text-editor__input:focus {
@@ -4623,9 +4956,10 @@ watch(mermaidEnabled, (enabled) => {
 .preview-annotation-text-editor__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
+/* ─── Pane sizes ─── */
 .workspace-card--pane .editor-textarea,
 .workspace-card--pane .preview-surface {
   min-height: 0;
@@ -4648,6 +4982,7 @@ watch(mermaidEnabled, (enabled) => {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ─── Settings Dialog ─── */
 .settings-dialog {
   width: min(980px, calc(100vw - 32px));
   max-width: 100%;
@@ -4660,19 +4995,19 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .settings-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.48);
-  backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
 }
 
 .settings-dialog__panel {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   padding: 22px;
-  border-radius: 28px;
+  border-radius: var(--lab-radius);
   background: var(--lab-surface);
   border: 1px solid var(--lab-border);
-  box-shadow: var(--lab-shadow);
-  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.15);
+  backdrop-filter: blur(16px);
 }
 
 .settings-dialog__head {
@@ -4684,79 +5019,100 @@ watch(mermaidEnabled, (enabled) => {
 
 .settings-dialog__head h2 {
   margin: 0;
-  font-size: 1.08rem;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .settings-dialog__head p {
   margin: 6px 0 0;
   color: var(--lab-muted);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   line-height: 1.5;
 }
 
+/* ─── Dark Mode Overrides ─── */
 .test-lab--dark .editor-textarea {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.94));
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.78), rgba(15, 23, 42, 0.7));
+  border-color: rgba(148, 163, 184, 0.1);
   color: #e2e8f0;
 }
 
+.test-lab--dark .editor-shell__toolbar,
+.test-lab--dark .preview-stage-frame,
+.workspace-card--preview-dark .preview-stage-frame {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.1);
+}
+
+.test-lab--dark .editor-shell__meta-item {
+  background: rgba(30, 41, 59, 0.72);
+  border-color: rgba(148, 163, 184, 0.1);
+  color: #cbd5e1;
+}
+
+.test-lab--dark .preview-surface__grid,
+.workspace-card--preview-dark .preview-surface__grid {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+}
+
 .test-lab--dark .preview-immersive-toolbar {
-  border-color: rgba(148, 163, 184, 0.16);
-  background: rgba(9, 18, 32, 0.86);
-  box-shadow: 0 18px 44px rgba(2, 6, 23, 0.42);
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
 }
 
 .test-lab--dark .preview-annotation-chip,
 .test-lab--dark .preview-annotation-text-editor {
-  border-color: rgba(148, 163, 184, 0.16);
-  background: rgba(9, 18, 32, 0.9);
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.85);
   color: #e2e8f0;
 }
 
 .test-lab--dark .preview-annotation-toolbar__hint {
-  color: rgba(226, 232, 240, 0.72);
+  color: rgba(226, 232, 240, 0.6);
 }
 
 .test-lab--dark .preview-annotation-chip--active {
-  background: rgba(37, 99, 235, 0.2);
-  border-color: rgba(96, 165, 250, 0.28);
-  color: #bfdbfe;
+  background: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.25);
+  color: #67e8f9;
 }
 
 .test-lab--dark .preview-annotation-selection__frame {
-  border-color: rgba(96, 165, 250, 0.82);
-  background: rgba(37, 99, 235, 0.16);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.86);
+  border-color: rgba(34, 211, 238, 0.72);
+  background: rgba(34, 211, 238, 0.12);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8);
 }
 
 .test-lab--dark .preview-annotation-selection__arrow {
-  background: rgba(96, 165, 250, 0.9);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.86);
+  background: rgba(34, 211, 238, 0.88);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8);
 }
 
 .test-lab--dark .preview-annotation-selection__handle {
-  border-color: rgba(15, 23, 42, 0.92);
-  background: #60a5fa;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.42);
+  border-color: rgba(15, 23, 42, 0.9);
+  background: #22d3ee;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
 .test-lab--dark .preview-annotation-selection__actions {
-  border-color: rgba(148, 163, 184, 0.16);
-  background: rgba(9, 18, 32, 0.9);
-  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.4);
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.88);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
 .test-lab--dark .preview-annotation-selection__action {
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(148, 163, 184, 0.08);
   color: #e2e8f0;
 }
 
 .test-lab--dark .preview-annotation-selection__action:hover {
-  background: rgba(96, 165, 250, 0.2);
-  color: #bfdbfe;
+  background: rgba(34, 211, 238, 0.16);
+  color: #67e8f9;
 }
 
 .test-lab--dark .preview-annotation-selection__action--danger:hover {
-  background: rgba(248, 113, 113, 0.18);
+  background: rgba(248, 113, 113, 0.12);
   color: #fecaca;
 }
 
@@ -4764,31 +5120,33 @@ watch(mermaidEnabled, (enabled) => {
   color: #e2e8f0;
 }
 
-.test-lab--dark .preview-surface {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.96));
+.test-lab--dark .preview-surface,
+.workspace-card--preview-dark .preview-surface {
+  background: rgba(2, 6, 23, 0.8);
 }
 
 .test-lab--dark .stream-summary {
-  background: rgba(15, 23, 42, 0.76);
-  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(148, 163, 184, 0.1);
 }
 
 .test-lab--dark .stream-summary__item {
-  background: rgba(30, 41, 59, 0.9);
-  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(148, 163, 184, 0.1);
 }
 
 .test-lab--dark .stream-summary__item--active {
-  background: rgba(37, 99, 235, 0.2);
-  border-color: rgba(96, 165, 250, 0.24);
-  color: #bfdbfe;
+  background: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.26);
+  color: #67e8f9;
 }
 
 .test-lab--dark .panel-card--sandbox .meta-list__row {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(148, 163, 184, 0.1);
 }
 
+/* ─── Fullscreen ─── */
 .workspace-card--preview:fullscreen {
   width: 100%;
   height: 100%;
@@ -4800,10 +5158,12 @@ watch(mermaidEnabled, (enabled) => {
   box-shadow: none;
   overflow: hidden;
   background: #fff;
+  color: #10203a;
+  color-scheme: light;
 }
 
 .workspace-card--preview:fullscreen::backdrop {
-  background: rgba(15, 23, 42, 0.78);
+  background: rgba(15, 23, 42, 0.7);
 }
 
 .workspace-card--preview:fullscreen .workspace-card__head,
@@ -4823,22 +5183,26 @@ watch(mermaidEnabled, (enabled) => {
   background: #fff;
 }
 
-.test-lab--dark .workspace-card--preview:fullscreen {
+.test-lab--dark .workspace-card--preview:fullscreen,
+.workspace-card--preview.workspace-card--preview-dark:fullscreen {
+  background: #020617;
+  color: #e2e8f0;
+  color-scheme: dark;
+}
+
+.test-lab--dark .workspace-card--preview:fullscreen .preview-surface,
+.workspace-card--preview.workspace-card--preview-dark:fullscreen .preview-surface {
   background: #020617;
 }
 
-.test-lab--dark .workspace-card--preview:fullscreen .preview-surface {
-  background: #020617;
-}
-
+/* ─── Sandbox Frame ─── */
 .sandbox-frame-shell {
   min-height: 620px;
-  background:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.9));
+  background: var(--lab-surface-strong);
 }
 
 .test-lab--dark .sandbox-frame-shell {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.92));
+  background: rgba(2, 6, 23, 0.8);
 }
 
 .sandbox-frame {
@@ -4847,8 +5211,9 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 620px;
   border: 0;
   background: transparent;
- }
+}
 
+/* ─── Markdown Renderer ─── */
 .preview-surface :deep(.markdown-renderer) {
   min-height: 100%;
 }
@@ -4870,6 +5235,7 @@ watch(mermaidEnabled, (enabled) => {
   max-width: 100%;
 }
 
+/* ─── Print ─── */
 @media print {
   .test-lab {
     padding: 0;
@@ -4917,6 +5283,7 @@ watch(mermaidEnabled, (enabled) => {
   }
 }
 
+/* ─── Desktop Layout (>1181px) ─── */
 @media (min-width: 1181px) {
   .lab-layout:not(.lab-layout--share-preview) {
     grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -4943,7 +5310,7 @@ watch(mermaidEnabled, (enabled) => {
     grid-column: 1 / 7;
   }
 
-  .workspace-card--preview {
+  .workspace-card--preview:not(.workspace-card--share-preview) {
     order: 4;
     grid-column: 7 / -1;
   }
@@ -5025,9 +5392,9 @@ watch(mermaidEnabled, (enabled) => {
   .panel-card--sandbox .meta-list {
     grid-template-columns: 1fr;
   }
-
 }
 
+/* ─── Tablet (<=1180px) ─── */
 @media (max-width: 1180px) {
   .workspace-grid {
     grid-template-columns: 1fr;
@@ -5057,10 +5424,11 @@ watch(mermaidEnabled, (enabled) => {
   }
 }
 
+/* ─── Mobile (<=820px) ─── */
 @media (max-width: 820px) {
   .test-lab {
     --workspace-pane-height: clamp(420px, 68vh, 680px);
-    padding: 18px 12px 28px;
+    padding: 16px 12px 28px;
   }
 
   .test-lab--share-preview {
@@ -5070,11 +5438,11 @@ watch(mermaidEnabled, (enabled) => {
   .hero-panel,
   .panel-card,
   .workspace-card {
-    border-radius: 22px;
+    border-radius: 16px;
   }
 
   .hero-panel {
-    padding: 22px 18px;
+    padding: 20px 16px;
   }
 
   .settings-dialog {
@@ -5083,8 +5451,8 @@ watch(mermaidEnabled, (enabled) => {
   }
 
   .settings-dialog__panel {
-    padding: 18px;
-    border-radius: 22px;
+    padding: 16px;
+    border-radius: 16px;
   }
 
   .hero-panel__metrics,
@@ -5101,6 +5469,15 @@ watch(mermaidEnabled, (enabled) => {
 
   .workspace-card {
     min-height: 640px;
+  }
+
+  .editor-shell {
+    padding: 12px;
+  }
+
+  .editor-shell__toolbar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .workspace-card--full,
@@ -5125,7 +5502,7 @@ watch(mermaidEnabled, (enabled) => {
   }
 
   .preview-immersive-toolbar {
-    gap: 8px;
+    gap: 6px;
     padding: 8px 10px;
   }
 

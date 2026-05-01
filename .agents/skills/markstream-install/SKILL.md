@@ -15,8 +15,9 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - Check `package.json`, app entry files, Tailwind or UnoCSS config, and whether the repo is SSR or streaming-focused.
    - Choose the package that matches the host app: `markstream-vue`, `markstream-vue2`, `markstream-react`, or `markstream-angular`.
 2. Install the smallest peer set that matches the requested features.
-   - Add peers only for features the user actually needs: Monaco, Mermaid, D2, KaTeX, or Shiki.
+   - Add peers only for features the user actually needs: Monaco, Mermaid, D2, KaTeX, or lightweight highlighting via `stream-markdown`.
    - Do not install every optional peer by default.
+   - For Vue 3 Monaco preloading, use `preloadCodeBlockRuntime` from `markstream-vue` so the renderer runtime knows Monaco is warm. Existing `getUseMonaco()` calls are still compatible.
 3. Fix CSS order.
    - Put reset styles before Markstream styles.
    - In Tailwind or UnoCSS projects, place `markstream-*/index.css` inside `@layer components`.

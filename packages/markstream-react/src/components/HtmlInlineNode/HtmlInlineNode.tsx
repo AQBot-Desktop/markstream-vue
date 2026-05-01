@@ -2,7 +2,7 @@ import type { ComponentType } from 'react'
 import type { NodeComponentProps } from '../../types/node-component'
 import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
-import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps } from 'stream-markdown-parser'
+import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, sanitizeHtmlContent } from 'stream-markdown-parser'
 import { getCustomNodeComponents } from '../../customComponents'
 import {
   hasCustomHtmlComponents,
@@ -171,6 +171,7 @@ export function HtmlInlineNode(props: NodeComponentProps<{
 
   // Get custom components from global registry
   const customComponents = getCustomNodeComponents(customId)
+  const safeHtmlContent = React.useMemo(() => sanitizeHtmlContent(node.content ?? ''), [node.content])
 
   // Computed property to determine render mode and content
   const renderMode = React.useMemo(() => {
@@ -198,9 +199,9 @@ export function HtmlInlineNode(props: NodeComponentProps<{
     const host = containerRef.current
     host.innerHTML = ''
     const template = document.createElement('template')
-    template.innerHTML = node.content ?? ''
+    template.innerHTML = safeHtmlContent
     host.appendChild(template.content.cloneNode(true))
-  }, [node.content, renderMode.mode, isClient])
+  }, [renderMode.mode, isClient, safeHtmlContent])
 
   // Loading state handling
   if (node.loading && !node.autoClosed) {

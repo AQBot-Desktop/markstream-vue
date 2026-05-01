@@ -159,7 +159,7 @@ This uses @vue/composition-api.
 Install dependencies:
 
 ```bash
-pnpm add shiki stream-markdown
+pnpm add stream-markdown
 ```
 
 ```vue

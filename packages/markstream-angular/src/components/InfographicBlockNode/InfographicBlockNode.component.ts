@@ -11,6 +11,7 @@ import {
   ViewChild,
 } from '@angular/core'
 import { getInfographic } from '../../optional/infographic'
+import { clampPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from '../shared/diagram-height'
 import { getString } from '../shared/node-helpers'
 import {
   clampNumber,
@@ -116,7 +117,7 @@ import {
           *ngIf="!showSource"
           #previewHost
           class="infographic-render"
-          [style.minHeight]="containerMinHeight"
+          [style.minHeight]="resolvedContainerMinHeight"
         ></div>
 
         <pre *ngIf="showSource" class="markstream-angular-enhanced-block__source"><code translate="no">{{ code }}</code></pre>
@@ -170,7 +171,7 @@ export class InfographicBlockNodeComponent implements AfterViewInit, OnChanges, 
   modalOpen = false
   zoom = 1
   error = ''
-  containerMinHeight = '320px'
+  containerMinHeight = ''
   svgMarkup = ''
 
   private viewReady = false
@@ -234,14 +235,32 @@ export class InfographicBlockNodeComponent implements AfterViewInit, OnChanges, 
     return resolveCssSize(this.mergedProps.maxHeight, '500px')
   }
 
+  get estimatedPreviewHeightPx() {
+    return clampPreviewHeight(
+      parsePositiveNumber(this.mergedProps.estimatedPreviewHeightPx) ?? estimateInfographicPreviewHeight(this.code),
+      undefined,
+      this.maxPreviewHeight,
+    )
+  }
+
+  get resolvedContainerMinHeight() {
+    return this.containerMinHeight || `${this.estimatedPreviewHeightPx}px`
+  }
+
+  private get maxPreviewHeight() {
+    if (this.mergedProps.maxHeight == null || this.mergedProps.maxHeight === 'none')
+      return this.mergedProps.maxHeight === 'none' ? null : 500
+    return parsePositiveNumber(this.mergedProps.maxHeight) ?? 500
+  }
+
   private resolveContainerMinHeight(actualHeight: number) {
-    const boundedHeight = Math.max(actualHeight, 280)
+    const boundedHeight = Math.max(actualHeight, this.estimatedPreviewHeightPx)
     const raw = this.mergedProps.maxHeight
     if (raw == null || raw === 'none')
       return `${boundedHeight}px`
 
-    const maxHeight = Number.parseFloat(String(raw))
-    if (!Number.isFinite(maxHeight))
+    const maxHeight = this.maxPreviewHeight
+    if (maxHeight == null)
       return `${boundedHeight}px`
 
     return `${Math.min(boundedHeight, maxHeight)}px`
@@ -269,6 +288,7 @@ export class InfographicBlockNodeComponent implements AfterViewInit, OnChanges, 
   ngOnChanges() {
     if (!this.viewReady)
       return
+    this.containerMinHeight = ''
     queueMicrotask(() => void this.renderInfographic())
   }
 

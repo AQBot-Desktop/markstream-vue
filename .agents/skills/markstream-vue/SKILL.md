@@ -1,6 +1,6 @@
 ---
 name: markstream-vue
-description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or Shiki, or wire scoped custom components in a non-Nuxt Vue repository.
+description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or stream-markdown, or wire scoped custom components in a non-Nuxt Vue repository.
 ---
 
 # Markstream Vue 3
@@ -22,6 +22,7 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 
 - Vue 3 apps default to `content`.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
+- When Monaco code blocks need app-level preloading, import `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` preloads remain valid; do not import `stream-monaco` directly just to warm workers.
 - If the host is actually Nuxt, leave SSR-specific setup to `markstream-nuxt`.
 
 ## Useful Doc Targets

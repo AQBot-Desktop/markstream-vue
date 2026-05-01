@@ -48,6 +48,7 @@ describe('mermaid streaming preview regression', () => {
     }))
     vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
       getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
     }))
 
     const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
@@ -91,6 +92,7 @@ describe('mermaid streaming preview regression', () => {
     }))
     vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
       getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
     }))
 
     const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
@@ -139,6 +141,7 @@ describe('mermaid streaming preview regression', () => {
     const getMermaid = vi.fn(async () => fakeMermaid)
     vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
       getMermaid,
+      isMermaidEnabled: vi.fn(() => true),
     }))
 
     const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
@@ -199,6 +202,7 @@ describe('mermaid streaming preview regression', () => {
     }))
     vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
       getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
     }))
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -243,6 +247,7 @@ describe('mermaid streaming preview regression', () => {
     }))
     vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
       getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
     }))
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})

@@ -97,7 +97,7 @@ for (const [lang, materialName] of Object.entries(ICON_MAP)) {
   }
 
   // Read SVG and ensure width/height attributes exist for proper inline rendering
-  let svg = readFileSync(srcFile, 'utf-8')
+  const svg = readFileSync(srcFile, 'utf-8')
   writeFileSync(dstFile, svg)
   copied++
 }

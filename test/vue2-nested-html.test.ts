@@ -130,4 +130,117 @@ describe('vue2 nested html helper', () => {
 
     expect(html).toBe('&lt;span&gt;partial')
   })
+
+  it('renders structured html wrappers while leaving blocked tags unstructured', () => {
+    const structuredHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'span',
+        raw: '<span style="font-size: 12px;"></span>',
+        content: '<span style="font-size: 12px;"></span>',
+        attrs: [['style', 'font-size: 12px;']],
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'beta' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(structuredHtml).toContain('<span style="font-size: 12px;">')
+    expect(structuredHtml).toContain('<ul><li>alpha</li><li>beta</li></ul>')
+
+    const blockedHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'script',
+        raw: '<script>\n\n- alpha\n\n</script>',
+        content: '<script>\n\n- alpha\n\n</script>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(blockedHtml).toBe('<script>\n\n- alpha\n\n</script>')
+    expect(blockedHtml).not.toContain('<ul>')
+
+    const literalHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'pre',
+        raw: '<pre>\n\n- alpha\n\n</pre>',
+        content: '<pre>\n\n- alpha\n\n</pre>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(literalHtml).toBe('<pre>\n\n- alpha\n\n</pre>')
+  })
+
+  it('sanitizes dangerous attrs on structured html wrappers', () => {
+    const html = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'a',
+        raw: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        attrs: [
+          ['href', 'javascript:alert(1)'],
+          ['onclick', 'alert(1)'],
+          ['data-safe', 'ok'],
+        ],
+        children: [
+          {
+            type: 'paragraph',
+            raw: 'safe child',
+            children: [{ type: 'text', raw: 'safe child', content: 'safe child' }],
+          },
+        ],
+      } as any,
+    )
+
+    expect(html).toContain('<a data-safe="ok">')
+    expect(html).toContain('<p>safe child</p>')
+    expect(html).not.toContain('onclick=')
+    expect(html).not.toContain('javascript:')
+  })
 })

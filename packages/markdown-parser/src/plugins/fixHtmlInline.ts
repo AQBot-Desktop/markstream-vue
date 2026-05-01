@@ -145,6 +145,10 @@ function tokenToRaw(token: Token) {
   return String(shape.raw ?? shape.content ?? shape.markup ?? '')
 }
 
+function isNonElementHtmlBlock(content: string) {
+  return /^\s*<\s*[!?]/.test(content)
+}
+
 function buildCommonHtmlTagSet(extraTags?: readonly string[]) {
   const set = new Set(BASE_COMMON_HTML_TAGS)
   if (extraTags && Array.isArray(extraTags)) {
@@ -541,6 +545,9 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
 
       const rawContent = getHtmlBlockCarrierContent(t)
       if (rawContent) {
+        if (isNonElementHtmlBlock(rawContent))
+          continue
+
         // Support both opening (<tag ...>) and closing (</tag>) blocks.
         const tag = (rawContent.match(/<\s*(?:\/\s*)?([^\s>/]+)/)?.[1] ?? '').toLowerCase()
         const isClosingTag = /^\s*<\s*\//.test(rawContent)
