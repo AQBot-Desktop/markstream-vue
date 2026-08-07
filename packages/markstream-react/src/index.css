@@ -1700,12 +1700,12 @@ body > div[id^="dmermaid-"] {
 }
 
 /* AQBot chat tuning */
-.markstream-react[data-custom-id="chat"] .paragraph-node {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .paragraph-node {
   margin: 0.5em 0;
   line-height: 1.5;
 }
 
-.markstream-react[data-custom-id="chat"] {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) {
   min-width: 0;
   color: var(--color-text);
   --markstream-code-fallback-bg: #f8fafc;
@@ -1717,17 +1717,17 @@ body > div[id^="dmermaid-"] {
   --vscode-focusBorder: rgba(15, 23, 42, 0.12);
 }
 
-.markstream-react[data-custom-id="chat"] .inline-code {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .inline-code {
   background: rgba(15, 23, 42, 0.06);
   color: #0f172a;
 }
 
-.markstream-react[data-custom-id="chat"].dark .inline-code {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .inline-code {
   background: rgba(255, 255, 255, 0.1);
   color: #e5e7eb;
 }
 
-.markstream-react[data-custom-id="chat"].dark {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark {
   --markstream-code-fallback-bg: #282c34;
   --markstream-code-fallback-fg: #abb2bf;
   --markstream-code-border-color: rgba(255, 255, 255, 0.12);
@@ -1737,79 +1737,79 @@ body > div[id^="dmermaid-"] {
   --vscode-focusBorder: rgba(255, 255, 255, 0.14);
 }
 
-.markstream-react[data-custom-id="chat"] .code-block,
-.markstream-react[data-custom-id="chat"] .code-block-node {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-node {
   background: #f8fafc;
   border: 1px solid rgba(148, 163, 184, 0.28);
 }
 
-.markstream-react[data-custom-id="chat"] .code-block,
-.markstream-react[data-custom-id="chat"] .code-block-node,
-.markstream-react[data-custom-id="chat"] .code-block-container,
-.markstream-react[data-custom-id="chat"] .code-block-body,
-.markstream-react[data-custom-id="chat"] .code-block-render {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-node,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-container,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-body,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-render {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
 }
 
-.markstream-react[data-custom-id="chat"] .code-block-header,
-.markstream-react[data-custom-id="chat"] .code-block-footer {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-header,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-footer {
   background: rgba(241, 245, 249, 0.96);
   border-color: rgba(148, 163, 184, 0.22);
 }
 
-.markstream-react[data-custom-id="chat"] .code-block-badge {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-badge {
   background: rgba(15, 23, 42, 0.08);
   color: #334155;
 }
 
-.markstream-react[data-custom-id="chat"] .code-block-btn {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-btn {
   background: rgba(255, 255, 255, 0.9);
   color: #334155;
   border-color: rgba(148, 163, 184, 0.35);
 }
 
-.markstream-react[data-custom-id="chat"] .code-block-btn:hover {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-btn:hover {
   background: rgba(15, 23, 42, 0.06);
   border-color: rgba(148, 163, 184, 0.32);
 }
 
-.markstream-react[data-custom-id="chat"].dark .code-block,
-.markstream-react[data-custom-id="chat"].dark .code-block-node,
-.markstream-react[data-custom-id="chat"].dark .code-block-header,
-.markstream-react[data-custom-id="chat"].dark .code-block-footer,
-.markstream-react[data-custom-id="chat"].dark .code-block-btn {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-node,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-header,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-footer,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-btn {
   background: #000000;
 }
 
-.markstream-react[data-custom-id="chat"].dark .code-block,
-.markstream-react[data-custom-id="chat"].dark .code-block-node,
-.markstream-react[data-custom-id="chat"].dark .code-block-header,
-.markstream-react[data-custom-id="chat"].dark .code-block-footer {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-node,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-header,
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-footer {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-.markstream-react[data-custom-id="chat"].dark .code-block-badge {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-badge {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(248, 250, 252, 0.92);
 }
 
-.markstream-react[data-custom-id="chat"].dark .code-block-btn {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-btn {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-.markstream-react[data-custom-id="chat"].dark .code-block-btn:hover {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-.markstream-react[data-custom-id="chat"] .code-block-container {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]) .code-block-container {
   --markstream-diff-focus: rgba(15, 23, 42, 0.12);
 }
 
-.markstream-react[data-custom-id="chat"].dark .code-block-container.is-dark {
+.markstream-react:is([data-custom-id="chat"], [data-custom-id="acp"]).dark .code-block-container.is-dark {
   --markstream-code-fallback-bg: #000000;
   --markstream-code-fallback-fg: #f8fafc;
   --markstream-code-border-color: rgba(255, 255, 255, 0.12);
