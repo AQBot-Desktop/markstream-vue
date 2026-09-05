@@ -4,6 +4,7 @@ import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import { parseInlineTokens } from './inline-parsers'
+import { normalizeCompleteCustomHtmlElementsOnOwnLine } from './normalize-complete-custom-html'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
 import { parseBlockquote } from './node-parsers/blockquote-parser'
 import { containerTokenHandlers } from './node-parsers/container-token-handlers'
@@ -1900,6 +1901,10 @@ export function parseMarkdownToStructure(
 
     if (tags.length) {
       safeMarkdown = ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(safeMarkdown, tags)
+      // A complete custom element on its own line must use the html_block source
+      // slice. Inline HTML treats "\<" as an escaped "<", so a summary ending in
+      // "\" would swallow the closing tag and the following markdown.
+      safeMarkdown = normalizeCompleteCustomHtmlElementsOnOwnLine(safeMarkdown, tags)
       // markdown-it doesn't always treat custom tags as html_block when the opening
       // tag and the first content token live on the same line (e.g. "<thinking> foo").
       // That causes the tag to be parsed as inline HTML and breaks custom block parsing.

@@ -420,12 +420,28 @@ function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   return /\d/.test(String(nextChar ?? ''))
 }
 
+function isLikelyCurrencyAmountClose(nextChar?: string) {
+  return /\d/.test(String(nextChar ?? ''))
+}
+
 function isLikelyPlaceholderDollar(content: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
     return false
   // Placeholder text like "$...$" / "$…$" is not math.
   return /^(?:\.{3,}|…+)$/.test(stripped)
+}
+
+function shouldRejectSingleDollarMath(content: string, nextChar?: string) {
+  if (content.includes('`'))
+    return true
+  if (!content || !content.trim())
+    return true
+  if (isLikelyCurrencyRangeDollar(content, nextChar))
+    return true
+  if (isLikelyPlaceholderDollar(content))
+    return true
+  return isLikelyCurrencyAmountClose(nextChar)
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
@@ -570,12 +586,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             }
 
             const content = text.slice(dollarIndex + 1, closingDollarIndex)
-            const hasBacktick = content.includes('`')
-            const isEmpty = !content || !content.trim()
             const nextChar = text[closingDollarIndex + 1]
-            const isCurrencyRange = isLikelyCurrencyRangeDollar(content, nextChar)
-            const isPlaceholder = isLikelyPlaceholderDollar(content)
-            if (!hasBacktick && !isEmpty && !isCurrencyRange && !isPlaceholder) {
+            if (!shouldRejectSingleDollarMath(content, nextChar)) {
               const token = s.push('math_inline', 'math', 0)
               token.content = normalizeStandaloneBackslashT(content, mathOpts)
               token.markup = '$'
@@ -788,6 +800,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const nextChar = src[endIdx + close.length]
         const isCurrencyRange = isDollar && isLikelyCurrencyRangeDollar(content, nextChar)
         const isPlaceholder = isDollar && isLikelyPlaceholderDollar(content)
+        const isAmountClose = isDollar && isLikelyCurrencyAmountClose(nextChar)
+        if (isAmountClose) {
+          // Reject this pairing and resume after the opener so a later `$4,365`
+          // is not consumed as a closer.
+          searchPos = index + open.length
+          continue
+        }
         const shouldSkip = strict
           ? (hasBacktick || isEmpty || isCurrencyRange || isPlaceholder)
           : (hasBacktick || isEmpty || isCurrencyRange || isPlaceholder || (!isDollar && !isMathLike(content)))
@@ -930,15 +949,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
               // Valid $...$ pattern
               const content = src.slice(dollarIndex + 1, closingDollarIndex)
-              const hasBacktick = content.includes('`')
-              const isEmpty = !content || !content.trim()
               const nextChar = src[closingDollarIndex + 1]
-              const isCurrencyRange = isLikelyCurrencyRangeDollar(content, nextChar)
-              const isPlaceholder = isLikelyPlaceholderDollar(content)
               // For explicit $...$ delimiters, accept any non-empty content
               // (e.g. "$H$", "$1$") even if the heuristic doesn't classify it
               // as "math-like".
-              if (!hasBacktick && !isEmpty && !isCurrencyRange && !isPlaceholder) {
+              if (!shouldRejectSingleDollarMath(content, nextChar)) {
                 // Push text before this $...$
                 const before = src.slice(searchPos, dollarIndex)
                 if (before) {
